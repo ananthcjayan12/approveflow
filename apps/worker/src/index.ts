@@ -63,8 +63,8 @@ async function getSession(c: any): Promise<SessionInfo | null> {
     FROM sessions s JOIN workspaces w ON w.owner_user_id = s.user_id
     WHERE s.token_hash = ? AND s.expires_at > datetime('now')
     LIMIT 1
-  `).bind(tokenHash).first<SessionInfo>();
-  return row || null;
+  `).bind(tokenHash).first();
+  return (row as SessionInfo | null) || null;
 }
 
 async function requireSession(c: any): Promise<SessionInfo | Response> {
@@ -124,7 +124,7 @@ async function workspaceForUpload(c: any): Promise<string | null> {
 }
 
 async function checkQuota(env: Env, workspaceId: string, size: number) {
-  const row = await env.DB.prepare('SELECT storage_used_bytes AS used, storage_quota_bytes AS quota FROM workspaces WHERE id=?').bind(workspaceId).first<{used:number;quota:number}>();
+  const row = await env.DB.prepare('SELECT storage_used_bytes AS used, storage_quota_bytes AS quota FROM workspaces WHERE id=?').bind(workspaceId).first() as Promise<{used:number;quota:number} | null>;
   if (!row) throw new Error('Workspace not found');
   if (row.used + size > row.quota) throw new Error('Storage quota exceeded');
 }
@@ -149,7 +149,7 @@ app.post('/api/auth/signup', async (c) => {
 
 app.post('/api/auth/login', async (c) => {
   const body = authBody.pick({ email: true, password: true }).parse(await c.req.json());
-  const user = await c.env.DB.prepare('SELECT id,password_hash,password_salt,name,email FROM users WHERE lower(email)=lower(?)').bind(body.email).first<{id:string;password_hash:string;password_salt:string;name:string;email:string}>();
+  const user = await c.env.DB.prepare('SELECT id,password_hash,password_salt,name,email FROM users WHERE lower(email)=lower(?)').bind(body.email).first() as Promise<{id:string;password_hash:string;password_salt:string;name:string;email:string} | null>;
   if (!user) return c.json({ error: 'Invalid email or password' }, 401);
   const pwd = await passwordHash(body.password, user.password_salt);
   if (pwd.hash !== user.password_hash) return c.json({ error: 'Invalid email or password' }, 401);
@@ -206,7 +206,7 @@ app.post('/api/assets/finalize-upload', async (c) => {
   const body = z.object({ projectId:z.string(), assetId:z.string().optional(), name:z.string().min(1), kind:z.enum(['image','video','carousel','pdf']), r2Key:z.string(), mimeType:z.string(), size:z.number().int().nonnegative(), durationMs:z.number().int().optional(), caption:z.string().optional() }).parse(await c.req.json());
   await checkQuota(c.env, session.workspaceId, body.size);
   const assetId=body.assetId||id('ast');
-  const existing=await c.env.DB.prepare('SELECT latest_version_no FROM assets WHERE id=? AND workspace_id=?').bind(assetId,session.workspaceId).first<{latest_version_no:number}>();
+  const existing=await c.env.DB.prepare('SELECT latest_version_no FROM assets WHERE id=? AND workspace_id=?').bind(assetId,session.workspaceId).first() as Promise<{latest_version_no:number} | null>;
   const version=(existing?.latest_version_no||0)+1; const versionId=id('ver');
   const statements=[] as D1PreparedStatement[];
   if(!existing) statements.push(c.env.DB.prepare('INSERT INTO assets (id,workspace_id,project_id,name,kind,caption,status,latest_version_no) VALUES (?,?,?,?,?,?,?,?)').bind(assetId,session.workspaceId,body.projectId,body.name,body.kind,body.caption||null,'draft',version));
@@ -235,7 +235,7 @@ app.post('/api/approvals', async (c) => {
 
 async function resolveReview(env:Env,token:string){
   const tokenHash=await sha256(token);
-  return env.DB.prepare(`SELECT rl.id AS link_id,rl.approval_request_id,ar.workspace_id,ar.project_id,ar.reviewer_name,ar.reviewer_email,ar.status,p.name AS project_name,c.company_name FROM review_links rl JOIN approval_requests ar ON ar.id=rl.approval_request_id JOIN projects p ON p.id=ar.project_id JOIN clients c ON c.id=p.client_id WHERE rl.token_hash=? AND rl.revoked_at IS NULL AND (rl.expires_at IS NULL OR rl.expires_at>datetime('now')) LIMIT 1`).bind(tokenHash).first<any>();
+  return env.DB.prepare(`SELECT rl.id AS link_id,rl.approval_request_id,ar.workspace_id,ar.project_id,ar.reviewer_name,ar.reviewer_email,ar.status,p.name AS project_name,c.company_name FROM review_links rl JOIN approval_requests ar ON ar.id=rl.approval_request_id JOIN projects p ON p.id=ar.project_id JOIN clients c ON c.id=p.client_id WHERE rl.token_hash=? AND rl.revoked_at IS NULL AND (rl.expires_at IS NULL OR rl.expires_at>datetime('now')) LIMIT 1`).bind(tokenHash).first();
 }
 
 app.get('/api/review/:token', async (c)=>{
