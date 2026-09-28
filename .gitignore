@@ -5,6 +5,8 @@ node_modules
 .dev.vars
 .wrangler
 .worker-build
+wrangler.generated.json
+.cloudflare-state.json
 apps/web/dist
 coverage
 .DS_Store
