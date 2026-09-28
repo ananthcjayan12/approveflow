@@ -27,6 +27,17 @@ type Env = {
 };
 
 type SessionInfo = { userId: string; workspaceId: string };
+type ReviewInfo = {
+  link_id: string;
+  approval_request_id: string;
+  workspace_id: string;
+  project_id: string;
+  reviewer_name: string | null;
+  reviewer_email: string | null;
+  status: string;
+  project_name: string;
+  company_name: string;
+};
 
 const app = new Hono<{ Bindings: Env }>();
 const enc = new TextEncoder();
@@ -235,7 +246,7 @@ app.post('/api/approvals', async (c) => {
 
 async function resolveReview(env:Env,token:string){
   const tokenHash=await sha256(token);
-  return env.DB.prepare(`SELECT rl.id AS link_id,rl.approval_request_id,ar.workspace_id,ar.project_id,ar.reviewer_name,ar.reviewer_email,ar.status,p.name AS project_name,c.company_name FROM review_links rl JOIN approval_requests ar ON ar.id=rl.approval_request_id JOIN projects p ON p.id=ar.project_id JOIN clients c ON c.id=p.client_id WHERE rl.token_hash=? AND rl.revoked_at IS NULL AND (rl.expires_at IS NULL OR rl.expires_at>datetime('now')) LIMIT 1`).bind(tokenHash).first();
+  return env.DB.prepare(`SELECT rl.id AS link_id,rl.approval_request_id,ar.workspace_id,ar.project_id,ar.reviewer_name,ar.reviewer_email,ar.status,p.name AS project_name,c.company_name FROM review_links rl JOIN approval_requests ar ON ar.id=rl.approval_request_id JOIN projects p ON p.id=ar.project_id JOIN clients c ON c.id=p.client_id WHERE rl.token_hash=? AND rl.revoked_at IS NULL AND (rl.expires_at IS NULL OR rl.expires_at>datetime('now')) LIMIT 1`).bind(tokenHash).first<ReviewInfo>();
 }
 
 app.get('/api/review/:token', async (c)=>{
