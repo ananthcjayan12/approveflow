@@ -1,0 +1,44 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "approveflow",
+  "main": "apps/worker/src/index.ts",
+  "compatibility_date": "2026-09-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "assets": {
+    "directory": "apps/web/dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*", "/health"]
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "approveflow-db",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "MEDIA",
+      "bucket_name": "approveflow-media"
+    }
+  ],
+  "triggers": {
+    "crons": ["*/30 * * * *"]
+  },
+  "vars": {
+    "APP_ORIGIN": "http://localhost:8787",
+    "R2_BUCKET_NAME": "approveflow-media",
+    "MAX_SINGLE_UPLOAD_BYTES": "104857600",
+    "MAX_VIDEO_BYTES": "5368709120",
+    "DEFAULT_STORAGE_QUOTA_BYTES": "10737418240",
+    "EMAIL_FROM": "ApproveFlow <approvals@example.com>"
+  },
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 0.2,
+    "redact_query_string": true
+  }
+}
