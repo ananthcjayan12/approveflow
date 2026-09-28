@@ -124,7 +124,7 @@ async function workspaceForUpload(c: any): Promise<string | null> {
 }
 
 async function checkQuota(env: Env, workspaceId: string, size: number) {
-  const row = await env.DB.prepare('SELECT storage_used_bytes AS used, storage_quota_bytes AS quota FROM workspaces WHERE id=?').bind(workspaceId).first() as Promise<{used:number;quota:number} | null>;
+  const row = (await env.DB.prepare('SELECT storage_used_bytes AS used, storage_quota_bytes AS quota FROM workspaces WHERE id=?').bind(workspaceId).first()) as {used:number;quota:number} | null;
   if (!row) throw new Error('Workspace not found');
   if (row.used + size > row.quota) throw new Error('Storage quota exceeded');
 }
@@ -149,7 +149,7 @@ app.post('/api/auth/signup', async (c) => {
 
 app.post('/api/auth/login', async (c) => {
   const body = authBody.pick({ email: true, password: true }).parse(await c.req.json());
-  const user = await c.env.DB.prepare('SELECT id,password_hash,password_salt,name,email FROM users WHERE lower(email)=lower(?)').bind(body.email).first() as Promise<{id:string;password_hash:string;password_salt:string;name:string;email:string} | null>;
+  const user = (await c.env.DB.prepare('SELECT id,password_hash,password_salt,name,email FROM users WHERE lower(email)=lower(?)').bind(body.email).first()) as {id:string;password_hash:string;password_salt:string;name:string;email:string} | null;
   if (!user) return c.json({ error: 'Invalid email or password' }, 401);
   const pwd = await passwordHash(body.password, user.password_salt);
   if (pwd.hash !== user.password_hash) return c.json({ error: 'Invalid email or password' }, 401);
@@ -206,7 +206,7 @@ app.post('/api/assets/finalize-upload', async (c) => {
   const body = z.object({ projectId:z.string(), assetId:z.string().optional(), name:z.string().min(1), kind:z.enum(['image','video','carousel','pdf']), r2Key:z.string(), mimeType:z.string(), size:z.number().int().nonnegative(), durationMs:z.number().int().optional(), caption:z.string().optional() }).parse(await c.req.json());
   await checkQuota(c.env, session.workspaceId, body.size);
   const assetId=body.assetId||id('ast');
-  const existing=await c.env.DB.prepare('SELECT latest_version_no FROM assets WHERE id=? AND workspace_id=?').bind(assetId,session.workspaceId).first() as Promise<{latest_version_no:number} | null>;
+  const existing=(await c.env.DB.prepare('SELECT latest_version_no FROM assets WHERE id=? AND workspace_id=?').bind(assetId,session.workspaceId).first()) as {latest_version_no:number} | null;
   const version=(existing?.latest_version_no||0)+1; const versionId=id('ver');
   const statements=[] as D1PreparedStatement[];
   if(!existing) statements.push(c.env.DB.prepare('INSERT INTO assets (id,workspace_id,project_id,name,kind,caption,status,latest_version_no) VALUES (?,?,?,?,?,?,?,?)').bind(assetId,session.workspaceId,body.projectId,body.name,body.kind,body.caption||null,'draft',version));
