@@ -1,54 +1,75 @@
-import { Bell, Plus, Search } from "lucide-react";
-import { useState } from "react";
-import { Link } from "react-router-dom";
+import { FolderOpen, Image as ImageIcon, Search, Users } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Link, useLocation } from "react-router-dom";
 import { useWorkspace } from "../lib/workspace";
+
 export function Topbar() {
   const { clients, projects, assets } = useWorkspace();
   const [query, setQuery] = useState("");
+  const input = useRef<HTMLInputElement>(null);
+  const location = useLocation();
+  useEffect(() => setQuery(""), [location.pathname]);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "/" && document.activeElement?.tagName === "BODY") {
+        e.preventDefault();
+        input.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+  const q = query.trim().toLowerCase();
   const results = [
     ...clients.map((c) => ({
       name: c.company_name,
+      hint: c.contact_name,
       path: `/app/clients/${c.id}`,
+      Icon: Users,
     })),
-    ...projects.map((p) => ({ name: p.name, path: `/app/projects/${p.id}` })),
-    ...assets.map((a) => ({ name: a.name, path: `/app/assets/${a.id}` })),
+    ...projects.map((p) => ({
+      name: p.name,
+      hint: p.company_name,
+      path: `/app/projects/${p.id}`,
+      Icon: FolderOpen,
+    })),
+    ...assets.map((a) => ({
+      name: a.name,
+      hint: projects.find((p) => p.id === a.project_id)?.name ?? "",
+      path: `/app/assets/${a.id}`,
+      Icon: ImageIcon,
+    })),
   ]
-    .filter((r) => r.name.toLowerCase().includes(query.toLowerCase()))
+    .filter((r) => `${r.name} ${r.hint}`.toLowerCase().includes(q))
     .slice(0, 8);
   return (
     <div className="topbar">
-      <div className="trial-search">
-        <div className="search">
-          <Search size={17} />
-          <input
-            aria-label="Search workspace"
-            placeholder="Search clients, projects, assets…"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-        </div>
-        {query && (
-          <div className="trial-search-results">
-            {results.map((r) => (
-              <Link key={r.path} to={r.path} onClick={() => setQuery("")}>
-                {r.name}
+      <div className="search">
+        <Search size={17} />
+        <input
+          ref={input}
+          type="search"
+          aria-label="Search"
+          placeholder="Search clients, projects or files…"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={(e) => e.key === "Escape" && setQuery("")}
+        />
+        <kbd>/</kbd>
+        {q && (
+          <div className="search-results">
+            {results.map(({ path, name, hint, Icon }) => (
+              <Link key={path} to={path}>
+                <Icon size={16} />
+                <span>
+                  <b>{name}</b>
+                  {hint && <small>{hint}</small>}
+                </span>
               </Link>
             ))}
-            {!results.length && <p>No matches found.</p>}
+            {!results.length && <p>No matches for “{query}”.</p>}
           </div>
         )}
-      </div>
-      <div className="topbar-actions">
-        <Link
-          aria-label="Recent activity"
-          className="icon-button"
-          to="/app/activity"
-        >
-          <Bell size={18} />
-        </Link>
-        <Link className="button button-primary small" to="/app/approvals/new">
-          <Plus size={16} /> New approval
-        </Link>
       </div>
     </div>
   );

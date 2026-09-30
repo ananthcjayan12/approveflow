@@ -99,3 +99,6 @@ export async function uploadFile(
   });
   return { key: create.key };
 }
+
+export const formBody = (form: HTMLFormElement) =>
+  Object.fromEntries(new FormData(form));

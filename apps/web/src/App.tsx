@@ -1,27 +1,27 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { AppShell } from "./components/AppShell";
+import { WorkspaceProvider } from "./lib/workspace";
 import { Login, Signup, Verify } from "./pages/AuthPages";
 import Landing from "./pages/Landing";
 import Pricing from "./pages/Pricing";
-import { WorkspaceProvider } from "./lib/workspace";
+import Onboarding from "./pages/Onboarding";
+import Dashboard from "./pages/Dashboard";
+import { ClientsList, ClientForm } from "./pages/Clients";
+import ClientDetail from "./pages/ClientDetail";
+import { ProjectsList, ProjectForm } from "./pages/Projects";
+import ProjectDetail from "./pages/ProjectDetail";
+import UploadContent from "./pages/UploadContent";
+import ApprovalNew from "./pages/ApprovalNew";
+import ActivityPage from "./pages/ActivityPage";
 import {
-  Dashboard,
-  ClientsList,
-  ClientForm,
-  ClientDetail,
-  ProjectsList,
-  ProjectForm,
-  ProjectDetail,
-  UploadContent,
-  ApprovalNew,
-  ActivityPage,
+  BillingSettings,
+  NotificationSettings,
   StoragePage,
   WorkspaceSettings,
-  NotificationSettings,
-  BillingSettings,
-  Onboarding,
-} from "./pages/TrialPages";
-import { ClientReview, AgencyAssetReview } from "./pages/ReviewPages";
+} from "./pages/SettingsPages";
+import ClientReview from "./pages/ClientReview";
+import AgencyAssetReview from "./pages/AgencyAssetReview";
+
 export default function App() {
   return (
     <Routes>
@@ -61,11 +61,9 @@ export default function App() {
         <Route path="approvals/new" element={<ApprovalNew />} />
         <Route path="activity" element={<ActivityPage />} />
         <Route path="storage" element={<StoragePage />} />
+        <Route path="settings" element={<Navigate to="workspace" replace />} />
         <Route path="settings/workspace" element={<WorkspaceSettings />} />
-        <Route
-          path="settings/notifications"
-          element={<NotificationSettings />}
-        />
+        <Route path="settings/notifications" element={<NotificationSettings />} />
         <Route path="settings/billing" element={<BillingSettings />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

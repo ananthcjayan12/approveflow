@@ -38,6 +38,7 @@ export type CommentRow = {
   asset_id: string;
   asset_version_id: string;
   body: string;
+  author_type?: string;
   author_name: string;
   created_at: string;
   x: number | null;
@@ -100,37 +101,30 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     window.addEventListener("focus", refresh);
     return () => window.removeEventListener("focus", refresh);
   }, []);
-  useEffect(() => {
-    if (!data) return;
-    document.documentElement.style.setProperty(
-      "--yellow",
-      data.workspace.brand_color,
-    );
-    return () => {
-      document.documentElement.style.removeProperty("--yellow");
-    };
-  }, [data?.workspace.brand_color]);
   if (unauthorized) return <Navigate to="/login" replace />;
   if (!data)
     return (
       <div className="center-page">
-        <div className="panel">
-          {error ? (
-            <>
-              <p role="alert">{error}</p>
-              <button onClick={() => void reload()}>Retry</button>
-            </>
-          ) : (
-            <p>Loading your workspace…</p>
-          )}
-        </div>
+        {error ? (
+          <div className="card center-card">
+            <h2>We couldn’t load your workspace</h2>
+            <p role="alert">{error}</p>
+            <button className="button button-primary" onClick={() => void reload()}>
+              Try again
+            </button>
+          </div>
+        ) : (
+          <div className="loading" role="status">
+            <span className="spinner" /> Loading your workspace…
+          </div>
+        )}
       </div>
     );
   return (
     <Context.Provider value={{ ...data, reload }}>
       {error && (
-        <p className="error-message" role="alert">
-          {error}
+        <p className="global-error" role="alert">
+          Something went wrong refreshing your data. {error}
         </p>
       )}
       {children}
@@ -144,4 +138,3 @@ export function useWorkspace() {
 }
 export const mediaUrl = (asset: AssetRow, token?: string) =>
   `/api/media/${asset.version_id}${token ? `?token=${encodeURIComponent(token)}` : ""}`;
-export const statusLabel = (status: string) => status.replaceAll("_", " ");
