@@ -51,7 +51,7 @@ export function ProjectsList() {
       ) : (
         <>
           {projects.length > 5 && (
-            <div className="search inline-search">
+            <div className="search-field inline-search">
               <Search size={17} />
               <input
                 type="search"

@@ -138,7 +138,7 @@ export function BillingSettings() {
     <SettingsLayout>
       <div className="card summary-card">
         <div>
-          <b className="capitalize">You’re on the {workspace.plan_key} plan</b>
+          <b>You’re on the <span className="capitalize">{workspace.plan_key}</span> plan</b>
           <span>
             {workspace.billingEnabled
               ? "Upgrade any time — you’ll be taken to a secure checkout."
@@ -148,6 +148,7 @@ export function BillingSettings() {
       </div>
       <Notice message={message} tone="error" />
       <PlanCards
+        headingLevel={2}
         action={(plan) =>
           workspace.plan_key === plan.key ? (
             <button className="button button-secondary full" disabled>
@@ -172,11 +173,12 @@ export function StoragePage() {
   const { workspace, assets } = useWorkspace();
   const pct = (workspace.storage_used_bytes / Math.max(1, workspace.storage_quota_bytes)) * 100;
   const byKind = [
-    ["image", "Images"],
-    ["video", "Videos"],
-    ["pdf", "PDFs"],
-  ].map(([kind, label]) => ({
+    ["image", "Images", "var(--brand)"],
+    ["video", "Videos", "var(--amber-dot)"],
+    ["pdf", "PDFs", "var(--green-dot)"],
+  ].map(([kind, label, dot]) => ({
     label,
+    dot,
     bytes: assets.filter((a) => a.kind === kind).reduce((s, a) => s + a.size_bytes, 0),
     count: assets.filter((a) => a.kind === kind).length,
   }));
@@ -194,6 +196,7 @@ export function StoragePage() {
           {byKind.map((k) => (
             <li key={k.label}>
               <span>
+                <i style={{ background: k.dot }} />
                 {k.label} <small>({k.count})</small>
               </span>
               <b>{formatBytes(k.bytes)}</b>

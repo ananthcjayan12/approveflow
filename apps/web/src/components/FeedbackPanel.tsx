@@ -1,14 +1,26 @@
-import { FormEvent, useRef, useState } from "react";
-import { Clock3, ExternalLink, MapPin, MousePointerClick, X } from "lucide-react";
-import { Avatar, Notice } from "./ui";
-import { api } from "../lib/api";
-import { formatSeconds, timeAgo } from "../lib/format";
+import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
+import { AlertCircle, ChevronDown, ChevronUp, ExternalLink, MessageSquare, X } from "lucide-react";
+import { Avatar } from "./ui";
+import { Annotator, Marked } from "./review/Annotator";
+import { Composer, CommentList } from "./review/CommentsPanel";
+import { MarkupToolbar, TOOLS } from "./review/MarkupToolbar";
+import { VideoStage } from "./review/VideoStage";
+import { DEFAULT_COLORS, Shape, SizeKey, Span, ToolId, placeComments } from "../lib/annotations";
+import { formatSpan } from "../lib/timeline";
+import { isTyping, keyboardOwnsControl, useKeyboardInset, useMediaQuery, useWindowKey } from "../lib/hooks";
+import { timeAgo } from "../lib/format";
 import { AssetRow, CommentRow, mediaUrl } from "../lib/workspace";
 
+const cx = (...c: Array<string | false | null | undefined>) => c.filter(Boolean).join(" ");
+type Sheet = "peek" | "compose" | "full";
+
 /**
- * The media viewer + comment thread shared by the client review page and the
- * agency's own asset page. Clients (token set) can pin comments on images and
- * attach them to video moments; the agency can reply in plain text.
+ * The review workspace: media stage with markup tools, the comment thread and
+ * composer. Shared by the client's review page and the designer's asset page.
+ *
+ * Reviewers can pin, draw, highlight and box things on images; on video they can
+ * comment on a moment, select a portion of the timeline, and mark up the frame.
  */
 export function FeedbackPanel({
   asset,
@@ -17,6 +29,8 @@ export function FeedbackPanel({
   canComment = true,
   disabledReason,
   onSave,
+  stageHeader,
+  className,
 }: {
   asset: AssetRow;
   comments: CommentRow[];
@@ -24,262 +38,356 @@ export function FeedbackPanel({
   canComment?: boolean;
   disabledReason?: string;
   onSave: () => Promise<void>;
+  /** Rendered at the top of the stage (title, pager, status). */
+  stageHeader?: ReactNode;
+  className?: string;
 }) {
-  const [text, setText] = useState("");
-  const [message, setMessage] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [point, setPoint] = useState<{ x: number; y: number } | null>(null);
-  const [active, setActive] = useState<string | null>(null);
-  const [time, setTime] = useState(0);
-  const [range, setRange] = useState(false);
-  const [end, setEnd] = useState(0);
-  const video = useRef<HTMLVideoElement>(null);
-  const box = useRef<HTMLTextAreaElement>(null);
-  const annotate = !!token && canComment;
-
-  const current = comments.filter((c) => c.asset_version_id === asset.version_id);
-  const old = comments.filter((c) => c.asset_version_id !== asset.version_id);
-  const pinned = current.filter((c) => c.x !== null && c.y !== null);
-  const pinNo = (c: CommentRow) => pinned.indexOf(c) + 1;
-  const now = () => video.current?.currentTime || 0;
-
-  async function submit(e: FormEvent) {
-    e.preventDefault();
-    if (!text.trim()) return;
-    setBusy(true);
-    setMessage("");
-    try {
-      if (range && end <= time) throw new Error("The end time needs to be after the start time.");
-      const annotation = !annotate
-        ? undefined
-        : point
-          ? { kind: "point", ...point }
-          : asset.kind === "video"
-            ? range
-              ? { kind: "video_range", startMs: Math.round(time * 1000), endMs: Math.round(end * 1000) }
-              : { kind: "video_timestamp", timestampMs: Math.round(time * 1000) }
-            : undefined;
-      await api(token ? `/api/review/${token}/comments` : `/api/assets/${asset.id}/comments`, {
-        method: "POST",
-        body: JSON.stringify({
-          assetId: asset.id,
-          assetVersionId: asset.version_id,
-          body: text.trim(),
-          annotation,
-        }),
-      });
-      setText("");
-      setPoint(null);
-      setRange(false);
-      await onSave();
-    } catch (err) {
-      setMessage((err as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  }
-
+  const isVideo = asset.kind === "video";
+  const isPdf = asset.kind === "pdf";
+  const reviewer = !!token;
+  const canMark = canComment && !isPdf;
   const src = mediaUrl(asset, token);
-  const seek = (c: CommentRow) => {
-    if (video.current) {
-      video.current.currentTime = (c.timestamp_ms ?? c.start_ms ?? 0) / 1000;
-      void video.current.play().catch(() => undefined);
-    }
+  const narrow = useMediaQuery("(max-width: 899px)");
+  useKeyboardInset();
+
+  const current = useMemo(() => comments.filter((c) => c.asset_version_id === asset.version_id), [comments, asset.version_id]);
+  const older = useMemo(() => comments.filter((c) => c.asset_version_id !== asset.version_id), [comments, asset.version_id]);
+  const placed = useMemo(() => placeComments(current), [current]);
+  const numbered = placed.filter((c) => c.n !== null).length;
+
+  // Tools & pending markup
+  const [tool, setTool] = useState<ToolId>(isVideo ? "hand" : "pin");
+  const [inks, setInks] = useState<Record<string, string>>({ ...DEFAULT_COLORS });
+  const [size, setSize] = useState<SizeKey>("M");
+  const [draft, setDraft] = useState<Shape[]>([]);
+  const [markedAt, setMarkedAt] = useState<number | null>(null);
+  const [portion, setPortion] = useState<Span | null>(null);
+  const [timestamped, setTimestamped] = useState(true);
+  const [settled, setSettled] = useState(0);
+
+  // Linking the thread and the media
+  const [hover, setHover] = useState<string | null>(null);
+  const [picked, setPicked] = useState<string | null>(null);
+  const [fresh, setFresh] = useState<string | null>(null);
+  const activeId = hover ?? picked ?? fresh;
+
+  const [sheet, setSheet] = useState<Sheet>("peek");
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const stageRef = useRef<HTMLElement | null>(null);
+  const textRef = useRef<HTMLTextAreaElement | null>(null);
+
+  const ink = tool === "hand" ? inks.pen : inks[tool];
+  const setInk = (color: string) => tool !== "hand" && setInks((prev) => ({ ...prev, [tool]: color }));
+
+  const focusComposer = useCallback(() => {
+    if (narrow) flushSync(() => setSheet((s) => (s === "full" ? s : "compose")));
+    textRef.current?.focus({ preventScroll: true });
+  }, [narrow]);
+
+  const addShape = (shape: Shape, time?: number) => {
+    setDraft((d) => (shape.t === "pin" ? [...d.filter((s) => s.t !== "pin"), shape] : [...d, shape]));
+    if (isVideo && time !== undefined) setMarkedAt((m) => m ?? time);
+    setPicked(null);
+    if (narrow) setSheet((s) => (s === "peek" ? "compose" : s));
+    // A pin is a complete gesture, so go straight to writing. Strokes are not:
+    // people usually draw several before typing.
+    if (shape.t === "pin") focusComposer();
   };
 
+  const undo = () =>
+    setDraft((d) => {
+      const next = d.slice(0, -1);
+      if (!next.length) setMarkedAt(null);
+      return next;
+    });
+  const clearDraft = () => {
+    setDraft([]);
+    setMarkedAt(null);
+  };
+  const setPortionAndSheet = useCallback(
+    (span: Span | null) => {
+      setPortion(span);
+      if (span && narrow) setSheet((s) => (s === "peek" ? "compose" : s));
+    },
+    [narrow],
+  );
+
+  const pick = useCallback(
+    (id: string) => {
+      setPicked(id);
+      const span = placed.find((c) => c.row.id === id)?.span;
+      if (isVideo && span && videoRef.current) videoRef.current.currentTime = span.start;
+      document.getElementById(`comment-${id}`)?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    },
+    [placed, isVideo],
+  );
+
+  const onPosted = async (id?: string) => {
+    clearDraft();
+    setPortion(null);
+    setTimestamped(true);
+    await onSave();
+    setSheet((s) => (s === "compose" ? "peek" : s));
+    if (id) {
+      setFresh(id);
+      setPicked(null);
+      requestAnimationFrame(() => document.getElementById(`comment-${id}`)?.scrollIntoView({ block: "nearest", behavior: "smooth" }));
+    }
+  };
+  useEffect(() => {
+    if (!fresh) return;
+    const t = setTimeout(() => setFresh(null), 2400);
+    return () => clearTimeout(t);
+  }, [fresh]);
+
+  // Shortcuts (Enter to comment, tool letters, undo, Esc)
+  useWindowKey((e) => {
+    if (isTyping(e.target)) return;
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z" && canMark) {
+      e.preventDefault();
+      undo();
+      return;
+    }
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    if (e.key === "Escape") {
+      if (portion) setPortion(null);
+      else if (draft.length) clearDraft();
+      else if (tool !== "hand" && isVideo) setTool("hand");
+      setPicked(null);
+      return;
+    }
+    if (e.key === "Enter" && canComment && !keyboardOwnsControl(e.target)) {
+      e.preventDefault();
+      focusComposer();
+      return;
+    }
+    if (!canMark) return;
+    const hit = TOOLS.find((t) => t.key.toLowerCase() === e.key.toLowerCase());
+    if (hit) {
+      e.preventDefault();
+      setTool(hit.id);
+    }
+  });
+
+  // Media-specific stage content
+  const marks: Marked[] = useMemo(
+    () => placed.filter((c) => c.shapes.length).map((c) => ({ id: c.row.id, n: c.n, shapes: c.shapes, color: c.color, anchor: c.anchor })),
+    [placed],
+  );
+  const [natural, setNatural] = useState<{ w: number; h: number } | null>(null);
+  const [imageFailed, setImageFailed] = useState(false);
+  const pickedComment = picked ? placed.find((c) => c.row.id === picked) : null;
+
+  const emptyHint = !canComment
+    ? "Comments will show up here once this has been sent."
+    : reviewer
+      ? isVideo
+        ? "Pause on a moment to comment, or drag along the timeline to select a portion. Happy with it? Just tap Approve."
+        : isPdf
+          ? "Write a note below (mention the page number). Happy with it? Just tap Approve."
+          : "Tap the image to drop a pin, or draw and highlight what should change. Happy with it? Just tap Approve."
+      : "No comments on this version yet.";
+
+  const total = current.length;
+
   return (
-    <div className="review-layout">
-      <section className="stage">
-        {asset.kind === "video" ? (
-          <video
-            ref={video}
-            src={src}
-            controls
-            playsInline
-            className="stage-video"
-            onPause={() => !range && setTime(now())}
-            onSeeked={() => !range && setTime(now())}
+    <div className={cx("workspace", className)} data-kind={asset.kind}>
+      <section className="stage" ref={stageRef}>
+        {stageHeader}
+
+        {canMark && (
+          <MarkupToolbar
+            tool={tool}
+            onTool={setTool}
+            color={ink}
+            onColor={setInk}
+            size={size}
+            onSize={setSize}
+            canUndo={draft.length > 0}
+            onUndo={undo}
+            onClear={clearDraft}
+            handLabel={isVideo ? "Play" : "Move"}
           />
-        ) : asset.kind === "pdf" ? (
-          <iframe className="stage-pdf" title={asset.name} src={src} />
-        ) : (
-          <div
-            className={`pin-surface ${annotate ? "can-pin" : ""}`}
-            onClick={(e) => {
-              if (!annotate) return;
-              const r = e.currentTarget.getBoundingClientRect();
-              setPoint({ x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height });
-              setActive(null);
-              setTimeout(() => box.current?.focus(), 0);
-            }}
-          >
-            <img src={src} alt={asset.name} draggable={false} />
-            {pinned.map((c) => (
-              <button
-                type="button"
-                key={c.id}
-                title={c.body}
-                className={`pin ${active === c.id ? "active" : ""}`}
-                style={{ left: `${c.x! * 100}%`, top: `${c.y! * 100}%` }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setActive(c.id);
-                  document.getElementById(`comment-${c.id}`)?.scrollIntoView({ block: "nearest", behavior: "smooth" });
-                }}
-              >
-                {pinNo(c)}
+        )}
+
+        <div className="stage-body">
+          {isPdf ? (
+            <>
+              <iframe className="pdf-frame" title={asset.name} src={src} />
+              <a className="button button-glass small pdf-open" href={src} target="_blank" rel="noreferrer">
+                <ExternalLink size={14} /> Open PDF
+              </a>
+            </>
+          ) : isVideo ? (
+            <VideoStage
+              src={src}
+              videoRef={videoRef}
+              stageRef={stageRef}
+              placed={placed}
+              draft={draft}
+              draftTime={markedAt}
+              draftNumber={numbered + 1}
+              tool={tool}
+              color={ink}
+              size={size}
+              canMark={canMark}
+              activeId={activeId}
+              selection={portion}
+              onSelection={setPortionAndSheet}
+              onDraw={addShape}
+              onHover={setHover}
+              onPick={pick}
+              onSettle={setSettled}
+            />
+          ) : (
+            <Annotator
+              media={natural}
+              tool={tool}
+              color={ink}
+              size={size}
+              marks={marks}
+              draft={draft}
+              draftNumber={numbered + 1}
+              activeId={activeId}
+              interactive={canMark}
+              zoomable
+              onBackgroundTap={() => setPicked(null)}
+              onDraw={addShape}
+              onHover={setHover}
+              onPick={pick}
+              overlay={
+                imageFailed && (
+                  <div className="media-error" role="alert">
+                    <AlertCircle size={22} />
+                    <b>This image couldn’t be loaded</b>
+                    <span>Check your connection, then try again or open the original file.</span>
+                    <div className="media-error-actions">
+                      <button className="button button-glass small" onClick={() => setImageFailed(false)}>
+                        Try again
+                      </button>
+                      <a className="button button-glass small" href={src} target="_blank" rel="noreferrer">
+                        Open original
+                      </a>
+                    </div>
+                  </div>
+                )
+              }
+            >
+              <img
+                key={String(imageFailed)}
+                className="media"
+                src={src}
+                alt={asset.name}
+                draggable={false}
+                onLoad={(e) => setNatural({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })}
+                onError={() => setImageFailed(true)}
+              />
+            </Annotator>
+          )}
+
+          {narrow && pickedComment && (
+            <div className="pick-card" role="status">
+              {pickedComment.n ? (
+                <span className="cbadge" style={{ ["--c" as string]: pickedComment.color }}>
+                  {pickedComment.n}
+                </span>
+              ) : (
+                <Avatar name={pickedComment.row.author_name} size="sm" />
+              )}
+              <div>
+                <b>{pickedComment.row.author_name}</b> <time>{timeAgo(pickedComment.row.created_at)}</time>
+                <p>{pickedComment.row.body}</p>
+                {pickedComment.span && <span className="chip is-time">{formatSpan(pickedComment.span)}</span>}
+              </div>
+              <button type="button" className="icon-button ghost" aria-label="Close" onClick={() => setPicked(null)}>
+                <X size={16} />
               </button>
-            ))}
-            {point && (
-              <span className="pin pending" style={{ left: `${point.x * 100}%`, top: `${point.y * 100}%` }}>
-                {pinned.length + 1}
-              </span>
-            )}
-          </div>
-        )}
-        {annotate && asset.kind !== "video" && asset.kind !== "pdf" && !point && (
-          <p className="stage-hint">
-            <MousePointerClick size={16} /> Tip: tap anywhere on the image to comment on that exact spot.
-          </p>
-        )}
-        {annotate && asset.kind === "pdf" && (
-          <p className="stage-hint">Tip: mention the page number in your comment.</p>
-        )}
-        <a className="link small open-original" href={src} target="_blank" rel="noreferrer">
-          <ExternalLink size={14} /> Open full size
-        </a>
+            </div>
+          )}
+        </div>
       </section>
 
-      <aside className="thread">
-        {asset.caption && (
-          <div className="caption-box">
-            <span className="field-label">Caption</span>
-            <p>{asset.caption}</p>
+      {narrow && sheet === "full" && <div className="sheet-backdrop" onClick={() => setSheet("peek")} />}
+
+      <aside className={cx("panel", narrow && `sheet-${sheet}`)} aria-label="Comments">
+        {narrow && (
+          <div className="sheet-handle">
+            <button
+              type="button"
+              className="sheet-title"
+              aria-expanded={sheet === "full"}
+              onClick={() => setSheet(sheet === "peek" ? "full" : "peek")}
+            >
+              <span className="grip" aria-hidden />
+              <MessageSquare size={16} />
+              <b>{sheet === "compose" ? "New comment" : "Comments"}</b>
+              {sheet !== "compose" && <span className="count">{total}</span>}
+            </button>
+            <button
+              type="button"
+              className="sheet-action"
+              onClick={() => {
+                if (sheet === "peek") {
+                  if (canComment) focusComposer();
+                  else setSheet("full");
+                } else if (sheet === "compose") setSheet("full");
+                else setSheet("peek");
+              }}
+            >
+              {sheet === "peek" ? (canComment ? "Add comment" : "View") : sheet === "compose" ? `View all (${total})` : "Close"}
+              {sheet === "full" ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
+            </button>
           </div>
         )}
-        <div className="thread-head">
-          <h3>Comments</h3>
-          <span className="count">{current.length}</span>
+
+        <div className="panel-body">
+          {asset.caption && (
+            <div className="caption-box">
+              <span className="field-label">Caption</span>
+              <p>{asset.caption}</p>
+            </div>
+          )}
+          {!narrow && (
+            <div className="panel-head">
+              <h2 className="panel-title">Comments</h2>
+              <span className="count">{total}</span>
+            </div>
+          )}
+          <CommentList
+            placed={placed}
+            older={older}
+            activeId={activeId}
+            freshId={fresh}
+            reviewer={reviewer}
+            portion={portion}
+            onClearPortion={() => setPortion(null)}
+            onPick={pick}
+            onHover={setHover}
+            onSeek={pick}
+            emptyHint={emptyHint}
+          />
         </div>
-        <ul className="comments">
-          {current.map((c) => {
-            const n = pinNo(c);
-            const at = c.timestamp_ms ?? c.start_ms;
-            return (
-              <li
-                key={c.id}
-                id={`comment-${c.id}`}
-                className={active === c.id ? "active" : ""}
-                onMouseEnter={() => setActive(c.id)}
-                onMouseLeave={() => setActive(null)}
-              >
-                {n > 0 ? <span className="pin static">{n}</span> : <Avatar name={c.author_name} size="sm" />}
-                <div>
-                  <div className="comment-meta">
-                    <b>{!token && c.author_type === "owner" ? "You" : c.author_name}</b>
-                    <time>{timeAgo(c.created_at)}</time>
-                  </div>
-                  <p>{c.body}</p>
-                  {at !== null && at !== undefined && (
-                    <button type="button" className="time-chip" onClick={() => seek(c)}>
-                      <Clock3 size={12} /> {formatSeconds(at / 1000)}
-                      {c.end_ms !== null && ` – ${formatSeconds(c.end_ms / 1000)}`}
-                    </button>
-                  )}
-                </div>
-              </li>
-            );
-          })}
-        </ul>
-        {!current.length && (
-          <p className="muted small thread-empty">
-            {token ? "No comments yet. Happy with it? Just tap Approve." : "No comments on this version yet."}
-          </p>
-        )}
-        {old.length > 0 && (
-          <details className="older">
-            <summary>Comments on earlier versions ({old.length})</summary>
-            {old.map((c) => (
-              <p key={c.id}>
-                <b>{c.author_name}:</b> {c.body}
-              </p>
-            ))}
-          </details>
-        )}
 
         {canComment ? (
-          <form className="composer" onSubmit={submit}>
-            {point && (
-              <div className="composer-context">
-                <MapPin size={14} /> Commenting on pin {pinned.length + 1}
-                <button type="button" aria-label="Remove pin" onClick={() => setPoint(null)}>
-                  <X size={14} />
-                </button>
-              </div>
-            )}
-            {annotate && asset.kind === "video" && (
-              <div className="composer-context">
-                <Clock3 size={14} />
-                {range ? (
-                  <>
-                    <button type="button" className="time-chip" onClick={() => setTime(now())} title="Set start to current time">
-                      {formatSeconds(time)}
-                    </button>
-                    →
-                    <button type="button" className="time-chip" onClick={() => setEnd(now())} title="Set end to current time">
-                      {formatSeconds(end)}
-                    </button>
-                    <button type="button" className="link small" onClick={() => setRange(false)}>
-                      Single moment
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    At {formatSeconds(time)}
-                    <button
-                      type="button"
-                      className="link small"
-                      onClick={() => {
-                        setRange(true);
-                        setEnd(Math.min(time + 3, video.current?.duration || time + 3));
-                      }}
-                    >
-                      Mark a range
-                    </button>
-                  </>
-                )}
-              </div>
-            )}
-            <textarea
-              ref={box}
-              aria-label="Your comment"
-              maxLength={10000}
-              rows={3}
-              value={text}
-              onFocus={() => {
-                if (asset.kind === "video" && video.current && !video.current.paused) {
-                  video.current.pause();
-                }
-              }}
-              onChange={(e) => setText(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void submit(e);
-              }}
-              placeholder={
-                point
-                  ? "What should change here?"
-                  : asset.kind === "video" && annotate
-                    ? "Pause the video where you want to comment…"
-                    : "Write a comment…"
-              }
-            />
-            <Notice message={message} tone="error" />
-            <button className="button button-secondary full" disabled={busy || !text.trim()}>
-              {busy ? "Posting…" : "Post comment"}
-            </button>
-          </form>
+          <Composer
+            asset={asset}
+            token={token}
+            isVideo={isVideo}
+            canMark={canMark}
+            draft={draft}
+            markedAt={markedAt}
+            now={settled}
+            portion={portion}
+            timestamped={timestamped}
+            onTimestamped={setTimestamped}
+            onClearDraft={clearDraft}
+            onClearPortion={() => setPortion(null)}
+            textareaRef={textRef}
+            onFocusText={() => isVideo && videoRef.current?.pause()}
+            onPosted={onPosted}
+          />
         ) : (
-          disabledReason && <p className="hint-box">{disabledReason}</p>
+          disabledReason && <p className="hint-box panel-hint">{disabledReason}</p>
         )}
       </aside>
     </div>

@@ -89,7 +89,7 @@ export function formatSeconds(seconds: number) {
 export const initials = (name: string) =>
   name
     .split(/\s+/)
-    .filter(Boolean)
+    .filter((word) => /^[\p{L}\p{N}]/u.test(word))
     .slice(0, 2)
     .map((part) => part[0])
     .join("")

@@ -13,9 +13,34 @@ This repository is Cloudflare-first and designed to stay inexpensive:
 - **Resend** for approval/reminder emails when configured
 - **Cron Trigger every 30 minutes** for reminders
 
-## Theme
+## Design
 
-The interface follows the selected Srshti Creative Studio direction: charcoal/black surfaces, warm cream cards, golden-yellow primary actions, rust/orange accents, bold editorial serif headings and clean sans-serif UI copy.
+A calm, modern SaaS look: cool neutral surfaces, one indigo brand colour, semantic status colours, and a dark
+theme that follows the system (or the user's choice). Every colour is a design token in
+`apps/web/src/styles/tokens.css`, and every text/background pairing was checked against WCAG AA. The media
+stage used for reviewing is always dark, like a photo viewer. See [`docs/DESIGN.md`](docs/DESIGN.md).
+
+The whole app is responsive: a sidebar on desktop, an icon rail on tablets, and a top bar with bottom tabs on
+phones. Review and markup work with mouse, touch and pen.
+
+## Reviewing: markup, zoom and video timelines
+
+Clients (and you, when replying) can mark up work directly:
+
+| On images | On video |
+|---|---|
+| Pin a comment to an exact spot | Comment on the current moment |
+| Freehand pen and highlighter | Drag on the timeline to select a **portion** (or press `I` / `O`) |
+| Boxes, circles and arrows | See only the comments inside a selected portion |
+| 9 colours, 3 thicknesses, undo | Draw on the paused frame with the same tools |
+| Pinch / scroll-wheel zoom, pan | Frame-step, speed, mute, fullscreen, comment markers on the timeline |
+
+Keyboard shortcuts: `V` move, `C` pin, `D` draw, `H` highlight, `R` box, `E` circle, `A` arrow, `⌘/Ctrl+Z`
+undo, `+` `-` `0` zoom, `Enter` write a comment, `Esc` cancel. On video: `Space` play/pause, `←` `→` step a
+frame (`Shift` = 5 s), `I` / `O` set the portion start / end, `M` mute, `F` fullscreen.
+
+Markup is stored as small, validated JSON with coordinates normalised to the media frame, so it lines up at any
+screen size. See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md#review-annotations).
 
 ## Quick start
 
@@ -122,12 +147,10 @@ comment on video timestamps/ranges, and approve or request changes without an
 account. The designer can read and reply to feedback and upload a new version.
 The dashboard, activity and storage screens use saved workspace data.
 
-Carousel slides are uploaded as individual images for this trial. PDFs support
-preview and text comments (include the page number). Drawing/rectangle tools,
-side-by-side version comparison, team management, password recovery and email
-verification are not implemented. Unavailable demo controls have been removed.
-Email delivery requires Resend; without it, copy/share links work normally.
-Billing remains unavailable unless Razorpay is configured.
+Carousel slides are uploaded as individual images for this trial. PDFs support preview and text comments
+(include the page number). Side-by-side version comparison, team management, password recovery and email
+verification are not implemented. Unavailable demo controls have been removed. Email delivery requires Resend;
+without it, copy/share links work normally. Billing remains unavailable unless Razorpay is configured.
 
 Run `npm run build && npm run test:trial` to exercise the complete API workflow
 against an isolated local Worker, D1 database and R2 bucket. This creates temporary

@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { Image as ImageIcon, Send, Upload } from "lucide-react";
+import { ExternalLink, Image as ImageIcon, Send, Upload } from "lucide-react";
 import { FeedbackPanel } from "../components/FeedbackPanel";
 import { EmptyState, Notice, PageHeader, StatusBadge } from "../components/ui";
 import { api } from "../lib/api";
 import { kindLabel } from "../lib/format";
-import { CommentRow, useWorkspace } from "../lib/workspace";
+import { CommentRow, mediaUrl, useWorkspace } from "../lib/workspace";
 
 export default function AgencyAssetReview() {
   const { id } = useParams();
@@ -31,6 +31,7 @@ export default function AgencyAssetReview() {
     );
   const needsChanges = asset.status === "changes_requested";
   const draft = asset.status === "draft";
+  const feedback = comments.filter((c) => c.asset_version_id === asset.version_id && c.author_type !== "owner").length;
   return (
     <>
       <PageHeader
@@ -40,6 +41,7 @@ export default function AgencyAssetReview() {
           <span className="inline-meta">
             <StatusBadge status={asset.status} />
             {kindLabel[asset.kind] ?? asset.kind} · Version {asset.latest_version_no}
+            {feedback > 0 && ` · ${feedback} ${feedback === 1 ? "comment" : "comments"} from your client`}
           </span>
         }
         action={
@@ -64,14 +66,29 @@ export default function AgencyAssetReview() {
         </p>
       )}
       <Notice message={message} tone="error" />
-      <FeedbackPanel
-        key={asset.version_id}
-        asset={asset}
-        comments={comments}
-        canComment={!draft}
-        disabledReason="Send this file for approval to start a conversation with your client."
-        onSave={load}
-      />
+      <div className="asset-workspace">
+        <FeedbackPanel
+          key={asset.version_id}
+          asset={asset}
+          comments={comments}
+          canComment={!draft}
+          disabledReason="Send this file for approval to start a conversation with your client."
+          onSave={load}
+          stageHeader={
+            <div className="stage-top">
+              <div className="stage-title">
+                <b>{kindLabel[asset.kind] ?? asset.kind} preview</b>
+                <span>What your client sees{asset.latest_version_no > 1 ? ` · Version ${asset.latest_version_no}` : ""}</span>
+              </div>
+              <div className="stage-actions">
+                <a className="icon-button" href={mediaUrl(asset)} target="_blank" rel="noreferrer" aria-label="Open original file" data-tip="Open original">
+                  <ExternalLink size={16} />
+                </a>
+              </div>
+            </div>
+          }
+        />
+      </div>
     </>
   );
 }

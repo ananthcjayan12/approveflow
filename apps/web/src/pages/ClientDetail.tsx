@@ -24,7 +24,7 @@ export default function ClientDetail() {
         back={{ to: "/app/clients", label: "Clients" }}
         title={
           <span className="title-with-avatar">
-            <Avatar name={client.company_name} size="lg" /> {client.company_name}
+            <Avatar name={client.company_name} size="lg" tint /> {client.company_name}
           </span>
         }
         action={

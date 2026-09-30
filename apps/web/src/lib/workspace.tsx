@@ -41,11 +41,16 @@ export type CommentRow = {
   author_type?: string;
   author_name: string;
   created_at: string;
+  kind?: string | null;
   x: number | null;
   y: number | null;
+  width?: number | null;
+  height?: number | null;
   timestamp_ms: number | null;
   start_ms: number | null;
   end_ms: number | null;
+  /** Versioned JSON of the markup drawn with the comment ({"v":1,"shapes":[...]}). */
+  shape_json?: string | null;
 };
 export type Workspace = {
   name: string;

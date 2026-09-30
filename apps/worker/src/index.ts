@@ -34,8 +34,12 @@ type ReviewInfo = {
   reviewer_name: string | null;
   reviewer_email: string | null;
   status: string;
+  message: string | null;
+  due_at: string | null;
   project_name: string;
   company_name: string;
+  workspace_name: string;
+  brand_color: string | null;
 };
 
 const app = new Hono<{ Bindings: Env }>();
@@ -193,6 +197,112 @@ async function workspaceForUpload(c: any): Promise<string | null> {
   return null;
 }
 
+// ---- Review markup ---------------------------------------------------------
+// Every coordinate is normalised to 0..1 of the media frame so markup lines up
+// at any screen size. Shapes are validated strictly and stored as JSON on the
+// annotation row; x/y/width/height hold the markup's bounding box.
+const unit = z.number().min(0).max(1);
+const point = z.tuple([unit, unit]);
+const markStyle = {
+  c: z.string().regex(/^#[0-9a-f]{6}$/i),
+  s: z.number().min(1).max(40),
+};
+const shapeSchema = z.discriminatedUnion("t", [
+  z.object({ t: z.literal("pin"), p: point, ...markStyle }),
+  z.object({ t: z.literal("rect"), a: point, b: point, ...markStyle }),
+  z.object({ t: z.literal("ellipse"), a: point, b: point, ...markStyle }),
+  z.object({ t: z.literal("arrow"), a: point, b: point, ...markStyle }),
+  z.object({
+    t: z.literal("pen"),
+    pts: z.array(point).min(2).max(600),
+    ...markStyle,
+  }),
+  z.object({
+    t: z.literal("highlight"),
+    pts: z.array(point).min(2).max(600),
+    ...markStyle,
+  }),
+]);
+const annotationSchema = z.object({
+  kind: z.enum([
+    "point",
+    "rectangle",
+    "drawing",
+    "video_timestamp",
+    "video_range",
+    "pdf_point",
+    "slide_point",
+  ]),
+  x: unit.optional(),
+  y: unit.optional(),
+  width: unit.optional(),
+  height: unit.optional(),
+  timestampMs: z.number().int().nonnegative().optional(),
+  startMs: z.number().int().nonnegative().optional(),
+  endMs: z.number().int().nonnegative().optional(),
+  slideNo: z.number().int().positive().optional(),
+  pageNo: z.number().int().positive().optional(),
+  shapes: z.array(shapeSchema).min(1).max(40).optional(),
+});
+type AnnotationInput = z.infer<typeof annotationSchema>;
+const MAX_MARKUP_JSON_CHARS = 64_000;
+
+function shapePoints(shape: z.infer<typeof shapeSchema>): [number, number][] {
+  if (shape.t === "pin") return [shape.p];
+  if (shape.t === "pen" || shape.t === "highlight") return shape.pts;
+  return [shape.a, shape.b];
+}
+
+/** Returns a user-facing problem with the annotation, or null when it is fine. */
+function annotationProblem(a: AnnotationInput | undefined): string | null {
+  if (!a) return null;
+  if (a.kind === "video_range" && (a.endMs ?? 0) <= (a.startMs ?? 0))
+    return "Invalid video range";
+  if (a.kind === "video_timestamp" && a.timestampMs === undefined)
+    return "A video comment needs a timestamp";
+  if (a.shapes && JSON.stringify(a.shapes).length > MAX_MARKUP_JSON_CHARS)
+    return "That drawing is too detailed. Try fewer marks.";
+  return null;
+}
+
+function annotationStatement(
+  env: Env,
+  commentId: string,
+  a: AnnotationInput,
+): D1PreparedStatement {
+  // Always keep a bounding box, even if a client only sent shapes.
+  let { x, y, width, height } = a;
+  if (a.shapes && (x === undefined || y === undefined)) {
+    const pts = a.shapes.flatMap(shapePoints);
+    const xs = pts.map((p) => p[0]);
+    const ys = pts.map((p) => p[1]);
+    x = Math.min(...xs);
+    y = Math.min(...ys);
+    width = Math.max(...xs) - x;
+    height = Math.max(...ys) - y;
+  }
+  return env.DB.prepare(
+    "INSERT INTO annotations (id,comment_id,kind,page_no,slide_no,x,y,width,height,timestamp_ms,start_ms,end_ms,shape_json) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+  ).bind(
+    id("ann"),
+    commentId,
+    a.kind,
+    a.pageNo || null,
+    a.slideNo || null,
+    x ?? null,
+    y ?? null,
+    width ?? null,
+    height ?? null,
+    a.timestampMs ?? null,
+    a.startMs ?? null,
+    a.endMs ?? null,
+    a.shapes ? JSON.stringify({ v: 1, shapes: a.shapes }) : null,
+  );
+}
+
+const COMMENT_COLUMNS =
+  "c.*,an.kind,an.x,an.y,an.width,an.height,an.timestamp_ms,an.start_ms,an.end_ms,an.shape_json";
+
 async function checkQuota(env: Env, workspaceId: string, size: number) {
   const row = (await env.DB.prepare(
     "SELECT storage_used_bytes AS used, storage_quota_bytes AS quota FROM workspaces WHERE id=?",
@@ -254,13 +364,14 @@ app.post("/api/auth/signup", async (c) => {
       null,
     ),
     c.env.DB.prepare(
-      "INSERT INTO workspaces (id,owner_user_id,name,reply_to_email,storage_quota_bytes) VALUES (?,?,?,?,?)",
+      "INSERT INTO workspaces (id,owner_user_id,name,reply_to_email,storage_quota_bytes,brand_color) VALUES (?,?,?,?,?,?)",
     ).bind(
       workspaceId,
       userId,
       `${body.name || "My"} Workspace`,
       body.email.toLowerCase(),
       Number(c.env.DEFAULT_STORAGE_QUOTA_BYTES || 1073741824),
+      "#5b5bd6",
     ),
   ]);
   await createSession(c, userId);
@@ -618,7 +729,7 @@ app.post("/api/approvals", async (c) => {
 async function resolveReview(env: Env, token: string) {
   const tokenHash = await sha256(token);
   return env.DB.prepare(
-    `SELECT rl.id AS link_id,rl.approval_request_id,ar.workspace_id,ar.project_id,ar.reviewer_name,ar.reviewer_email,ar.status,p.name AS project_name,c.company_name FROM review_links rl JOIN approval_requests ar ON ar.id=rl.approval_request_id JOIN projects p ON p.id=ar.project_id JOIN clients c ON c.id=p.client_id WHERE rl.token_hash=? AND rl.revoked_at IS NULL AND (rl.expires_at IS NULL OR datetime(rl.expires_at)>datetime('now')) LIMIT 1`,
+    `SELECT rl.id AS link_id,rl.approval_request_id,ar.workspace_id,ar.project_id,ar.reviewer_name,ar.reviewer_email,ar.status,ar.message,ar.due_at,p.name AS project_name,c.company_name,w.name AS workspace_name,w.brand_color FROM review_links rl JOIN approval_requests ar ON ar.id=rl.approval_request_id JOIN projects p ON p.id=ar.project_id JOIN clients c ON c.id=p.client_id JOIN workspaces w ON w.id=ar.workspace_id WHERE rl.token_hash=? AND rl.revoked_at IS NULL AND (rl.expires_at IS NULL OR datetime(rl.expires_at)>datetime('now')) LIMIT 1`,
   )
     .bind(tokenHash)
     .first<ReviewInfo>();
@@ -629,12 +740,12 @@ app.get("/api/review/:token", async (c) => {
   if (!review)
     return c.json({ error: "Review link is invalid or expired" }, 404);
   const assets = await c.env.DB.prepare(
-    `SELECT a.*,v.id AS version_id,v.version_no,v.r2_key,v.mime_type,v.size_bytes,v.duration_ms FROM approval_request_assets ara JOIN assets a ON a.id=ara.asset_id LEFT JOIN asset_versions v ON v.asset_id=a.id AND v.version_no=a.latest_version_no WHERE ara.approval_request_id=? ORDER BY a.created_at`,
+    `SELECT a.*,v.id AS version_id,v.version_no,v.r2_key,v.mime_type,v.size_bytes,v.duration_ms FROM approval_request_assets ara JOIN assets a ON a.id=ara.asset_id LEFT JOIN asset_versions v ON v.asset_id=a.id AND v.version_no=a.latest_version_no WHERE ara.approval_request_id=? ORDER BY a.created_at,a.rowid`,
   )
     .bind(review.approval_request_id)
     .all();
   const comments = await c.env.DB.prepare(
-    `SELECT c.*,an.kind,an.x,an.y,an.timestamp_ms,an.start_ms,an.end_ms FROM comments c LEFT JOIN annotations an ON an.comment_id=c.id WHERE c.approval_request_id=? ORDER BY c.created_at`,
+    `SELECT ${COMMENT_COLUMNS} FROM comments c LEFT JOIN annotations an ON an.comment_id=c.id WHERE c.approval_request_id=? ORDER BY c.created_at,c.rowid`,
   )
     .bind(review.approval_request_id)
     .all();
@@ -653,28 +764,7 @@ app.post("/api/review/:token/comments", async (c) => {
       assetId: z.string(),
       assetVersionId: z.string().optional(),
       body: z.string().trim().min(1).max(10000),
-      annotation: z
-        .object({
-          kind: z.enum([
-            "point",
-            "rectangle",
-            "drawing",
-            "video_timestamp",
-            "video_range",
-            "pdf_point",
-            "slide_point",
-          ]),
-          x: z.number().min(0).max(1).optional(),
-          y: z.number().min(0).max(1).optional(),
-          width: z.number().min(0).max(1).optional(),
-          height: z.number().min(0).max(1).optional(),
-          timestampMs: z.number().int().nonnegative().optional(),
-          startMs: z.number().int().nonnegative().optional(),
-          endMs: z.number().int().nonnegative().optional(),
-          slideNo: z.number().int().positive().optional(),
-          pageNo: z.number().int().positive().optional(),
-        })
-        .optional(),
+      annotation: annotationSchema.optional(),
     })
     .parse(await c.req.json());
   const asset = await c.env.DB.prepare(
@@ -689,11 +779,8 @@ app.post("/api/review/:token/comments", async (c) => {
       { error: "This creative has a new version. Reload before submitting." },
       409,
     );
-  if (
-    body.annotation?.kind === "video_range" &&
-    (body.annotation.endMs ?? 0) <= (body.annotation.startMs ?? 0)
-  )
-    return c.json({ error: "Invalid video range" }, 400);
+  const problem = annotationProblem(body.annotation);
+  if (problem) return c.json({ error: problem }, 400);
   const commentId = id("com");
   const statements: D1PreparedStatement[] = [
     c.env.DB.prepare(
@@ -708,27 +795,8 @@ app.post("/api/review/:token/comments", async (c) => {
       body.body,
     ),
   ];
-  if (body.annotation) {
-    const a = body.annotation;
-    statements.push(
-      c.env.DB.prepare(
-        "INSERT INTO annotations (id,comment_id,kind,page_no,slide_no,x,y,width,height,timestamp_ms,start_ms,end_ms) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
-      ).bind(
-        id("ann"),
-        commentId,
-        a.kind,
-        a.pageNo || null,
-        a.slideNo || null,
-        a.x ?? null,
-        a.y ?? null,
-        a.width ?? null,
-        a.height ?? null,
-        a.timestampMs ?? null,
-        a.startMs ?? null,
-        a.endMs ?? null,
-      ),
-    );
-  }
+  if (body.annotation)
+    statements.push(annotationStatement(c.env, commentId, body.annotation));
   await c.env.DB.batch(statements);
   await audit(c.env, review.workspace_id, "review.comment", {
     projectId: review.project_id,
@@ -1160,7 +1228,7 @@ app.get("/api/assets", async (c) => {
   const session = await requireSession(c);
   if (session instanceof Response) return session;
   const rows = await c.env.DB.prepare(
-    `SELECT a.*,v.id AS version_id,v.size_bytes,v.mime_type FROM assets a JOIN asset_versions v ON v.asset_id=a.id AND v.version_no=a.latest_version_no WHERE a.workspace_id=? ORDER BY a.created_at DESC`,
+    `SELECT a.*,v.id AS version_id,v.size_bytes,v.mime_type FROM assets a JOIN asset_versions v ON v.asset_id=a.id AND v.version_no=a.latest_version_no WHERE a.workspace_id=? ORDER BY a.created_at DESC,a.rowid DESC`,
   )
     .bind(session.workspaceId)
     .all();
@@ -1170,7 +1238,7 @@ app.get("/api/assets/:id/comments", async (c) => {
   const session = await requireSession(c);
   if (session instanceof Response) return session;
   const rows = await c.env.DB.prepare(
-    `SELECT c.*,an.kind,an.x,an.y,an.timestamp_ms,an.start_ms,an.end_ms FROM comments c JOIN assets a ON a.id=c.asset_id LEFT JOIN annotations an ON an.comment_id=c.id WHERE a.id=? AND a.workspace_id=? ORDER BY c.created_at`,
+    `SELECT ${COMMENT_COLUMNS} FROM comments c JOIN assets a ON a.id=c.asset_id LEFT JOIN annotations an ON an.comment_id=c.id WHERE a.id=? AND a.workspace_id=? ORDER BY c.created_at,c.rowid`,
   )
     .bind(c.req.param("id"), session.workspaceId)
     .all();
@@ -1180,8 +1248,13 @@ app.post("/api/assets/:id/comments", async (c) => {
   const session = await requireSession(c);
   if (session instanceof Response) return session;
   const body = z
-    .object({ body: z.string().trim().min(1).max(10000) })
+    .object({
+      body: z.string().trim().min(1).max(10000),
+      annotation: annotationSchema.optional(),
+    })
     .parse(await c.req.json());
+  const problem = annotationProblem(body.annotation);
+  if (problem) return c.json({ error: problem }, 400);
   const asset = await c.env.DB.prepare(
     `SELECT a.id,v.id AS version_id,ara.approval_request_id FROM assets a JOIN asset_versions v ON v.asset_id=a.id AND v.version_no=a.latest_version_no JOIN approval_request_assets ara ON ara.asset_id=a.id JOIN approval_requests ar ON ar.id=ara.approval_request_id WHERE a.id=? AND a.workspace_id=? ORDER BY ar.created_at DESC LIMIT 1`,
   )
@@ -1192,20 +1265,30 @@ app.post("/api/assets/:id/comments", async (c) => {
       { error: "Send this asset for review before starting a discussion" },
       400,
     );
-  await c.env.DB.prepare(
-    "INSERT INTO comments (id,approval_request_id,asset_id,asset_version_id,author_type,author_name,body) VALUES (?,?,?,?,?,?,?)",
+  // Sign replies with the studio's name so clients see who is talking.
+  const studio = await c.env.DB.prepare(
+    "SELECT name FROM workspaces WHERE id=?",
   )
-    .bind(
-      id("com"),
+    .bind(session.workspaceId)
+    .first<{ name: string }>();
+  const commentId = id("com");
+  const statements: D1PreparedStatement[] = [
+    c.env.DB.prepare(
+      "INSERT INTO comments (id,approval_request_id,asset_id,asset_version_id,author_type,author_name,body) VALUES (?,?,?,?,?,?,?)",
+    ).bind(
+      commentId,
       asset.approval_request_id,
       asset.id,
       asset.version_id,
       "owner",
-      "Designer",
+      studio?.name || "Designer",
       body.body,
-    )
-    .run();
-  return c.json({ ok: true });
+    ),
+  ];
+  if (body.annotation)
+    statements.push(annotationStatement(c.env, commentId, body.annotation));
+  await c.env.DB.batch(statements);
+  return c.json({ ok: true, id: commentId });
 });
 app.get("/api/activity", async (c) => {
   const session = await requireSession(c);

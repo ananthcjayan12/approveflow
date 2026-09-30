@@ -52,7 +52,7 @@ export default function Onboarding() {
   };
   const suggested = workspace.name.endsWith(" Workspace") ? "" : workspace.name;
   return (
-    <div className="onboarding">
+    <main className="onboarding">
       <Brand />
       <div className="onboarding-card card">
         <ol className="dots" aria-label={`Step ${step + 1} of 2`}>
@@ -99,6 +99,6 @@ export default function Onboarding() {
           </form>
         )}
       </div>
-    </div>
+    </main>
   );
 }

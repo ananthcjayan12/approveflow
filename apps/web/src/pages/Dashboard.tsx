@@ -92,23 +92,27 @@ function SetupChecklist() {
   );
 }
 
-function Stat({
+function Kpi({
   icon,
   tone,
   value,
   label,
+  hot = false,
 }: {
   icon: ReactNode;
   tone: string;
   value: number;
   label: string;
+  hot?: boolean;
 }) {
   return (
-    <div className="stat">
-      <span className={`stat-icon tone-${tone}`}>{icon}</span>
+    <div className={`kpi${hot ? " is-hot" : ""}`}>
+      <div className="kpi-top">
+        <span className={`stat-icon tone-${tone}`}>{icon}</span>
+      </div>
       <div>
         <strong>{value}</strong>
-        <span>{label}</span>
+        <span className="kpi-label">{label}</span>
       </div>
     </div>
   );
@@ -172,30 +176,16 @@ export default function Dashboard() {
   return (
     <>
       <PageHeader
-        title={`${greeting()}, ${workspace.name}`}
-        description="Here’s where your approvals stand today."
+        title={greeting()}
+        description={`Here’s where approvals stand at ${workspace.name}.`}
       />
       <SetupChecklist />
       {assets.length > 0 && (
-        <div className="stats">
-          <Stat
-            icon={<AlertCircle size={20} />}
-            tone="red"
-            value={changes.length}
-            label="Need your changes"
-          />
-          <Stat
-            icon={<Clock3 size={20} />}
-            tone="amber"
-            value={waiting.length}
-            label="Waiting for client"
-          />
-          <Stat
-            icon={<CheckCircle2 size={20} />}
-            tone="green"
-            value={approved.length}
-            label="Approved"
-          />
+        <div className="kpis">
+          <Kpi icon={<AlertCircle size={20} />} tone="red" value={changes.length} label="Need your changes" hot={changes.length > 0} />
+          <Kpi icon={<Clock3 size={20} />} tone="amber" value={waiting.length} label="Waiting for client" />
+          <Kpi icon={<Send size={20} />} tone="blue" value={drafts.length} label="Ready to send" />
+          <Kpi icon={<CheckCircle2 size={20} />} tone="green" value={approved.length} label="Approved" />
         </div>
       )}
       <div className="split">

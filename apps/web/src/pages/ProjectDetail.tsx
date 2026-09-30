@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { CalendarDays, FolderOpen, Send, Upload, UploadCloud } from "lucide-react";
 import { EmptyState, PageHeader, ProgressBar, StatusBadge, Thumb } from "../components/ui";
-import { formatDate, isWaiting } from "../lib/format";
+import { formatDate, isWaiting, kindLabel } from "../lib/format";
 import { AssetRow, useWorkspace } from "../lib/workspace";
 
 const filters: Array<{ key: string; label: string; match: (a: AssetRow) => boolean }> = [
@@ -85,35 +85,32 @@ export default function ProjectDetail() {
             </div>
             <ProgressBar value={(approved / mine.length) * 100} tone="green" label="Approved" />
           </div>
-          <div className="tabs" role="tablist">
-            {filters.map((f) => {
-              const count = mine.filter(f.match).length;
-              if (f.key !== "all" && !count) return null;
-              return (
-                <button
-                  key={f.key}
-                  role="tab"
-                  aria-selected={filter === f.key}
-                  className={filter === f.key ? "tab active" : "tab"}
-                  onClick={() => setFilter(f.key)}
-                >
-                  {f.label} <span>{count}</span>
-                </button>
-              );
-            })}
+          <div className="toolbar-row">
+            <div className="segmented" role="tablist" aria-label="Filter files">
+              {filters.map((f) => {
+                const count = mine.filter(f.match).length;
+                if (f.key !== "all" && !count) return null;
+                return (
+                  <button key={f.key} role="tab" aria-selected={filter === f.key} onClick={() => setFilter(f.key)}>
+                    {f.label} <span>{count}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
           <div className="asset-grid">
             {shown.map((a) => (
               <Link className="asset-card" key={a.id} to={`/app/assets/${a.id}`}>
                 <div className="thumb thumb-card">
-                  <Thumb asset={a} />
+                  <Thumb asset={a} badge />
+                  <span className="thumb-corner">
+                    <StatusBadge status={a.status} />
+                  </span>
+                  {a.latest_version_no > 1 && <span className="thumb-ver">v{a.latest_version_no}</span>}
                 </div>
                 <div className="asset-card-body">
                   <b title={a.name}>{a.name}</b>
-                  <div className="asset-card-meta">
-                    <StatusBadge status={a.status} />
-                    {a.latest_version_no > 1 && <span className="muted small">v{a.latest_version_no}</span>}
-                  </div>
+                  <span>{kindLabel[a.kind] ?? a.kind}</span>
                 </div>
               </Link>
             ))}

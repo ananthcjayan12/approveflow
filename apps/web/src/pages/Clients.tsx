@@ -42,7 +42,7 @@ export function ClientsList() {
       ) : (
         <>
           {clients.length > 5 && (
-            <div className="search inline-search">
+            <div className="search-field inline-search">
               <Search size={17} />
               <input
                 type="search"
@@ -58,10 +58,12 @@ export function ClientsList() {
               const count = projects.filter((p) => p.client_id === c.id).length;
               return (
                 <Link className="card card-link client-card" key={c.id} to={`/app/clients/${c.id}`}>
-                  <Avatar name={c.company_name} size="lg" />
-                  <div>
-                    <h3>{c.company_name}</h3>
-                    <p>{c.contact_name}</p>
+                  <div className="client-card-top">
+                    <Avatar name={c.company_name} size="lg" tint />
+                    <div>
+                      <h2>{c.company_name}</h2>
+                      <p>{c.contact_name}</p>
+                    </div>
                   </div>
                   <div className="client-card-foot">
                     <span>

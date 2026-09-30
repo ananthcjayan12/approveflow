@@ -239,6 +239,45 @@ try {
     },
     status: 201,
   });
+  // Freehand / shape markup is stored as validated JSON and read back intact.
+  const mark = { c: "#ef4444", s: 6 };
+  const drawingComment = {
+    assetId: asset.assetId,
+    assetVersionId: asset.versionId,
+    body: "Circle the logo and move it left",
+    annotation: {
+      kind: "drawing",
+      x: 0.1,
+      y: 0.1,
+      width: 0.4,
+      height: 0.3,
+      shapes: [
+        { t: "pen", pts: [[0.1, 0.1], [0.2, 0.15], [0.4, 0.3]], ...mark },
+        { t: "arrow", a: [0.5, 0.5], b: [0.7, 0.6], ...mark },
+      ],
+    },
+  };
+  await request(`/api/review/${token}/comments`, {
+    body: drawingComment,
+    status: 201,
+  });
+  for (const shapes of [
+    [{ t: "pen", pts: [[2, 0], [0, 0]], ...mark }], // outside the frame
+    [{ t: "script", ...mark }], // unknown tool
+    [{ t: "pin", p: [0.1, 0.1], c: "red", s: 6 }], // not a hex colour
+    [{ t: "pen", pts: [[0.1, 0.1]], ...mark }], // a stroke needs two points
+  ])
+    await request(`/api/review/${token}/comments`, {
+      body: { ...drawingComment, annotation: { kind: "drawing", shapes } },
+      status: 400,
+    });
+  await request(`/api/review/${token}/comments`, {
+    body: {
+      ...drawingComment,
+      annotation: { kind: "video_timestamp" }, // a video comment needs a time
+    },
+    status: 400,
+  });
   await request(`/api/review/${token}/decision`, {
     body: {
       assetId: "unrelated",
@@ -267,6 +306,27 @@ try {
     cookie,
     body: { body: "Updated in version 2" },
   });
+  // The designer can answer with markup too, signed with the studio name.
+  await request(`/api/assets/${asset.assetId}/comments`, {
+    cookie,
+    body: {
+      body: "Moved — see the arrow",
+      annotation: {
+        kind: "point",
+        shapes: [{ t: "pin", p: [0.5, 0.5], ...mark }],
+      },
+    },
+  });
+  const thread = (
+    await request(`/api/assets/${asset.assetId}/comments`, { cookie })
+  ).data;
+  const drawn = thread.find((c) => c.body === drawingComment.body);
+  assert.equal(JSON.parse(drawn.shape_json).shapes.length, 2);
+  assert.equal(drawn.width, 0.4);
+  const reply = thread.find((c) => c.body === "Moved — see the arrow");
+  assert.equal(reply.author_name, "Test Designer Workspace");
+  assert.equal(reply.x, 0.5); // bounding box derived from the shapes
+  assert.equal(JSON.parse(reply.shape_json).shapes[0].t, "pin");
   const revision = await upload(asset.assetId);
   assert.equal(revision.version, 2);
   await request(`/api/review/${token}/decision`, {
@@ -289,7 +349,8 @@ try {
     "approved",
   );
   const saved = (await request(`/api/review/${token}`)).data;
-  assert.equal(saved.comments.length, 2);
+  assert.equal(saved.comments.length, 4);
+  assert.equal(saved.workspace_name, "Test Designer Workspace");
   assert.equal(saved.status, "approved");
   await request("/api/workspace", {
     cookie,

@@ -1,6 +1,8 @@
 import { FormEvent, useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import { Check, Eye, EyeOff } from "lucide-react";
+import { MarkupArt } from "../components/marketing/Mock";
+import { ThemeToggle } from "../components/ThemeToggle";
 import { Brand } from "../components/Brand";
 import { Field, Notice } from "../components/ui";
 import { api } from "../lib/api";
@@ -29,10 +31,13 @@ function Auth({ signup = false }: { signup?: boolean }) {
   };
   return (
     <div className="auth">
-      <div className="auth-main">
-        <Link to="/">
-          <Brand />
-        </Link>
+      <main className="auth-main">
+        <div className="auth-top">
+          <Link to="/" aria-label="ApproveFlow home">
+            <Brand />
+          </Link>
+          <ThemeToggle />
+        </div>
         <form className="auth-form form" onSubmit={submit}>
           <h1>{signup ? "Create your free account" : "Welcome back"}</h1>
           <p className="muted">
@@ -77,16 +82,22 @@ function Auth({ signup = false }: { signup?: boolean }) {
             </Link>
           </p>
         </form>
-      </div>
+      </main>
       <aside className="auth-aside">
         <div>
           <h2>Client approvals, finally simple.</h2>
           <ul className="checks light">
             <li><Check size={18} /> Send posts, reels and designs in one link</li>
             <li><Check size={18} /> Clients approve without creating an account</li>
-            <li><Check size={18} /> Comments pinned right where changes are needed</li>
+            <li><Check size={18} /> Draw, highlight and comment right on the work</li>
             <li><Check size={18} /> Know exactly what’s approved — and what’s not</li>
           </ul>
+          <div className="auth-art" aria-hidden>
+            <MarkupArt />
+            <span className="auth-chip">
+              <Check size={16} strokeWidth={3} /> Priya approved 4 posts
+            </span>
+          </div>
         </div>
       </aside>
     </div>

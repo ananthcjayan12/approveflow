@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import {
   AlertCircle,
@@ -7,20 +7,27 @@ import {
   ChevronLeft,
   ChevronRight,
   CircleHelp,
-  Eye,
-  MessageSquare,
+  ExternalLink,
+  MousePointerClick,
   PartyPopper,
+  Pencil,
   ThumbsUp,
 } from "lucide-react";
 import { Brand } from "../components/Brand";
 import { FeedbackPanel } from "../components/FeedbackPanel";
+import { ThemeToggle } from "../components/ThemeToggle";
 import { Modal, Notice, ProgressBar, Thumb } from "../components/ui";
 import { api } from "../lib/api";
-import { AssetRow, CommentRow } from "../lib/workspace";
+import { formatDate, kindLabel } from "../lib/format";
+import { AssetRow, CommentRow, mediaUrl } from "../lib/workspace";
 
 type ReviewData = {
   project_name: string;
   company_name: string;
+  workspace_name?: string;
+  brand_color?: string | null;
+  message?: string | null;
+  due_at?: string | null;
   reviewer_name: string;
   reviewer_email: string;
   assets: AssetRow[];
@@ -52,30 +59,47 @@ const storage = {
   },
 };
 
+const firstName = (full: string) => (full || "").split(/\s+/).find((w) => w && !w.endsWith(".")) ?? "";
+
 function Welcome({ data, onStart }: { data: ReviewData; onStart: () => void }) {
-  // "Dr. Priya Shah" → "Priya"; skip titles so the greeting sounds natural.
-  const name = (data.reviewer_name || "").split(/\s+/).find((w) => w && !w.endsWith(".")) ?? "";
+  const name = firstName(data.reviewer_name);
   const n = data.assets.length;
+  const hasVideo = data.assets.some((a) => a.kind === "video");
   return (
-    <Modal title="How to review" onClose={onStart}>
+    <Modal title="How to review" onClose={onStart} wide>
       <div className="welcome">
         <h2>{name ? `Hi ${name}!` : "Hi there!"}</h2>
         <p>
-          {n} {n === 1 ? "item" : "items"} from <b>{data.project_name}</b> {n === 1 ? "is" : "are"} ready for your
-          review. It only takes a minute.
+          {n} {n === 1 ? "item" : "items"} from <b>{data.workspace_name || data.project_name}</b> {n === 1 ? "is" : "are"} ready for your
+          review{data.due_at ? <> — a decision is needed by <b>{formatDate(data.due_at)}</b></> : ""}. It only takes a minute.
         </p>
+        {data.message?.trim() && (
+          <div className="welcome-note">
+            <small>A note from {data.workspace_name || "your designer"}</small>
+            {data.message.trim()}
+          </div>
+        )}
         <ol className="how-steps">
           <li>
-            <span className="stat-icon tone-blue"><Eye size={18} /></span>
-            <div><b>Look at each item</b><span>Use the arrows or the pictures at the top to move between them.</span></div>
+            <span className="stat-icon tone-blue"><MousePointerClick size={18} /></span>
+            <div>
+              <b>Point at what you mean</b>
+              <span>Tap the image to drop a pin. {hasVideo ? "On videos, drag along the timeline to select a portion." : "You can also zoom in for detail."}</span>
+            </div>
           </li>
           <li>
-            <span className="stat-icon tone-amber"><MessageSquare size={18} /></span>
-            <div><b>Comment if something should change</b><span>Tap directly on an image to point at the exact spot.</span></div>
+            <span className="stat-icon tone-amber"><Pencil size={18} /></span>
+            <div>
+              <b>Draw, highlight or circle it</b>
+              <span>Pick the pen, highlighter, box or arrow from the toolbar, then write what should change.</span>
+            </div>
           </li>
           <li>
             <span className="stat-icon tone-green"><ThumbsUp size={18} /></span>
-            <div><b>Approve or request changes</b><span>Use the big buttons at the bottom. You can change your mind later.</span></div>
+            <div>
+              <b>Approve or request changes</b>
+              <span>Use the buttons for each item. You can change your mind later.</span>
+            </div>
           </li>
         </ol>
         <button className="button button-primary large full" onClick={onStart} autoFocus>
@@ -92,25 +116,50 @@ function AllDone({ data, onBack }: { data: ReviewData; onBack: () => void }) {
   const changes = data.assets.filter((a) => a.status === "changes_requested").length;
   return (
     <div className="done-screen">
-      <span className="success-icon big">
-        <PartyPopper size={40} />
-      </span>
-      <h1>All done — thank you!</h1>
-      <p>Your feedback has been sent to the team. You can close this page now.</p>
-      <div className="done-summary">
-        <span className="tag tone-green">
-          <CheckCircle2 size={15} /> {approved} approved
+      <div className="done-inner">
+        <span className="success-icon big">
+          <PartyPopper size={40} />
         </span>
-        {changes > 0 && (
-          <span className="tag tone-red">
-            <AlertCircle size={15} /> {changes} need changes
+        <h1>All done — thank you!</h1>
+        <p>Your feedback has been sent to {data.workspace_name || "the team"}. You can close this page now.</p>
+        <div className="done-summary">
+          <span className="tag tone-green">
+            <CheckCircle2 size={15} /> {approved} approved
           </span>
-        )}
+          {changes > 0 && (
+            <span className="tag tone-red">
+              <AlertCircle size={15} /> {changes} need changes
+            </span>
+          )}
+        </div>
+        <button className="button button-secondary" onClick={onBack}>
+          Look at them again
+        </button>
       </div>
-      <button className="button button-secondary" onClick={onBack}>
-        Look at them again
-      </button>
     </div>
+  );
+}
+
+function DecisionButtons({
+  asset,
+  busy,
+  onApprove,
+  onRequest,
+}: {
+  asset: AssetRow;
+  busy: boolean;
+  onApprove: () => void;
+  onRequest: () => void;
+}) {
+  return (
+    <>
+      <button className="button button-danger-outline" disabled={busy} onClick={onRequest}>
+        Request changes
+      </button>
+      <button className="button button-success" disabled={busy || asset.status === "approved"} onClick={onApprove}>
+        <Check size={17} strokeWidth={3} /> {asset.status === "approved" ? "Approved" : "Approve"}
+      </button>
+    </>
   );
 }
 
@@ -138,6 +187,13 @@ export default function ClientReview() {
     const t = setTimeout(() => setToast(""), 2600);
     return () => clearTimeout(t);
   }, [toast]);
+  useEffect(() => {
+    if (data) document.title = `Review · ${data.project_name}`;
+  }, [data]);
+
+  const assets = data?.assets ?? [];
+  const asset = assets.length ? assets[Math.min(index, assets.length - 1)] : null;
+  const comments = useMemo(() => (data && asset ? data.comments.filter((c) => c.asset_id === asset.id) : []), [data, asset]);
 
   if (!data)
     return (
@@ -156,7 +212,7 @@ export default function ClientReview() {
       </div>
     );
 
-  if (!data.assets.length)
+  if (!asset)
     return (
       <div className="center-page">
         <div className="card center-card">
@@ -166,18 +222,13 @@ export default function ClientReview() {
       </div>
     );
 
-  const assets = data.assets;
-  const asset = assets[Math.min(index, assets.length - 1)];
   const doneCount = assets.filter(decided).length;
   const allDone = doneCount === assets.length;
-  const mineOnThis = data.comments.filter(
-    (c) => c.asset_id === asset.id && c.asset_version_id === asset.version_id,
-  ).length;
+  const mineOnThis = comments.filter((c) => c.asset_version_id === asset.version_id).length;
 
   const go = (i: number) => {
     setIndex(Math.max(0, Math.min(assets.length - 1, i)));
     setError("");
-    window.scrollTo({ top: 0, behavior: "smooth" });
   };
   const nextPending = (fresh: AssetRow[]) => {
     for (let step = 1; step <= fresh.length; step++) {
@@ -188,6 +239,7 @@ export default function ClientReview() {
   };
 
   async function decide(decision: "approved" | "changes_requested", note = "") {
+    if (!asset) return;
     setBusy(true);
     setError("");
     try {
@@ -218,101 +270,112 @@ export default function ClientReview() {
 
   const status = clientStatus[asset.status];
 
+  const decisionButtons = (
+    <DecisionButtons asset={asset} busy={busy} onApprove={() => void decide("approved")} onRequest={() => setAsking(true)} />
+  );
+
   return (
-    <div className="review-page">
-      <header className="review-header">
-        <Brand compact />
-        <div className="review-title">
-          <b>{data.project_name}</b>
-          <span>for {data.company_name}</span>
+    <div className="rv">
+      <header className="rv-header">
+        <div className="rv-id">
+          <Brand compact />
+          <div className="rv-title">
+            <h1>{data.project_name}</h1>
+            <span>
+              {data.workspace_name ? `${data.workspace_name} · ` : ""}for {data.company_name}
+            </span>
+          </div>
         </div>
-        <button className="icon-button" aria-label="How to review" title="How to review" onClick={() => setWelcome(true)}>
-          <CircleHelp size={19} />
-        </button>
+        <div className="rv-progress" aria-label="Review progress">
+          <span className="rv-progress-full">
+            <b>{doneCount}</b> of {assets.length} reviewed
+          </span>
+          <span className="rv-progress-short" aria-hidden>
+            <b>{doneCount}</b>/{assets.length}
+          </span>
+          <ProgressBar value={(doneCount / assets.length) * 100} tone="green" label="Review progress" />
+        </div>
+        <div className="rv-actions">
+          <ThemeToggle className="icon-button ghost theme-hide" />
+          <button className="icon-button ghost" aria-label="How to review" data-tip="How to review" onClick={() => setWelcome(true)}>
+            <CircleHelp size={18} />
+          </button>
+          <div className="decision-buttons">{decisionButtons}</div>
+        </div>
       </header>
 
       {allDone && showDone ? (
         <AllDone data={data} onBack={() => setShowDone(false)} />
       ) : (
         <>
-          <div className="review-progress">
-            <span>
-              <b>{doneCount}</b> of {assets.length} reviewed
-            </span>
-            <ProgressBar value={(doneCount / assets.length) * 100} tone="green" label="Review progress" />
+          <div className={`rv-body${assets.length > 1 ? "" : " single"}`}>
+            {assets.length > 1 && (
+              <nav className="rv-rail" aria-label="Items to review">
+                {assets.map((a, i) => (
+                  <button
+                    key={a.id}
+                    className={`film ${i === index ? "current" : ""}`}
+                    onClick={() => go(i)}
+                    aria-label={`Item ${i + 1}: ${a.name}`}
+                    aria-current={i === index}
+                  >
+                    <Thumb asset={a} token={token} />
+                    <span className="film-num">{i + 1}</span>
+                    {decided(a) && (
+                      <span className={`film-mark tone-${a.status === "approved" ? "green" : "red"}`}>
+                        {a.status === "approved" ? <Check size={11} strokeWidth={3.4} /> : <AlertCircle size={11} strokeWidth={3} />}
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </nav>
+            )}
+
+            <main className="rv-main">
+              <Notice message={error} tone="error" />
+              <FeedbackPanel
+                key={asset.version_id}
+                asset={asset}
+                token={token}
+                comments={comments}
+                onSave={load}
+                stageHeader={
+                  <div className="stage-top">
+                    {assets.length > 1 && (
+                      <div className="pager">
+                        <button aria-label="Previous item" disabled={index === 0} onClick={() => go(index - 1)}>
+                          <ChevronLeft size={17} />
+                        </button>
+                        <span>
+                          {index + 1} / {assets.length}
+                        </span>
+                        <button aria-label="Next item" disabled={index === assets.length - 1} onClick={() => go(index + 1)}>
+                          <ChevronRight size={17} />
+                        </button>
+                      </div>
+                    )}
+                    <div className="stage-title">
+                      <b>{asset.name}</b>
+                      <span>
+                        {kindLabel[asset.kind] ?? asset.kind}
+                        {asset.latest_version_no > 1 && ` · Version ${asset.latest_version_no}`}
+                      </span>
+                    </div>
+                    <div className="stage-actions">
+                      {status && (
+                        <span className={`badge tone-${status.tone}`}>{status.label}</span>
+                      )}
+                      <a className="icon-button" href={mediaUrl(asset, token)} target="_blank" rel="noreferrer" aria-label="Open original file" data-tip="Open original">
+                        <ExternalLink size={16} />
+                      </a>
+                    </div>
+                  </div>
+                }
+              />
+            </main>
           </div>
 
-          {assets.length > 1 && (
-            <nav className="filmstrip" aria-label="Items to review">
-              {assets.map((a, i) => (
-                <button
-                  key={a.id}
-                  className={`film ${i === index ? "current" : ""}`}
-                  onClick={() => go(i)}
-                  aria-label={`Item ${i + 1}: ${a.name}`}
-                  aria-current={i === index}
-                >
-                  <Thumb asset={a} token={token} />
-                  {decided(a) && (
-                    <span className={`film-mark tone-${a.status === "approved" ? "green" : "red"}`}>
-                      {a.status === "approved" ? <Check size={12} strokeWidth={3} /> : <AlertCircle size={12} />}
-                    </span>
-                  )}
-                </button>
-              ))}
-            </nav>
-          )}
-
-          <main className="review-main">
-            <div className="review-item-head">
-              <div>
-                <span className="muted small">
-                  Item {index + 1} of {assets.length}
-                  {asset.latest_version_no > 1 && ` · Version ${asset.latest_version_no}`}
-                </span>
-                <h1>{asset.name}</h1>
-              </div>
-              {status && <span className={`badge tone-${status.tone}`}>{status.label}</span>}
-            </div>
-            <Notice message={error} tone="error" />
-            <FeedbackPanel
-              key={asset.version_id}
-              asset={asset}
-              token={token}
-              comments={data.comments.filter((c) => c.asset_id === asset.id)}
-              onSave={load}
-            />
-          </main>
-
-          <footer className="decision-bar">
-            <div className="decision-inner">
-              <div className="pager">
-                <button className="icon-button" disabled={index === 0} onClick={() => go(index - 1)} aria-label="Previous item">
-                  <ChevronLeft size={20} />
-                </button>
-                <button
-                  className="icon-button"
-                  disabled={index === assets.length - 1}
-                  onClick={() => go(index + 1)}
-                  aria-label="Next item"
-                >
-                  <ChevronRight size={20} />
-                </button>
-              </div>
-              <div className="decision-buttons">
-                <button className="button button-danger-outline large" disabled={busy} onClick={() => setAsking(true)}>
-                  Request changes
-                </button>
-                <button
-                  className="button button-success large"
-                  disabled={busy || asset.status === "approved"}
-                  onClick={() => void decide("approved")}
-                >
-                  <Check size={18} strokeWidth={3} /> {asset.status === "approved" ? "Approved" : "Approve"}
-                </button>
-              </div>
-            </div>
-          </footer>
+          <footer className="rv-decision">{decisionButtons}</footer>
         </>
       )}
 

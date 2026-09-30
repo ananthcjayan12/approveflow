@@ -47,12 +47,26 @@ Keep values configurable server-side rather than hard-coding them into the front
 
 ## Review annotations
 
-Image marker coordinates are normalized between 0 and 1 so the same annotation appears correctly at any viewport size.
+All coordinates are normalised to the media frame (0..1), so the same markup appears correctly at any viewport
+size and zoom level. Stroke widths are stored in per-mille of the media width for the same reason.
 
-Video annotations store either:
+Each comment has at most one row in `annotations`:
 
-- `timestamp_ms`
-- `start_ms` and `end_ms`
-- optional normalized frame `x` / `y`
+| Column | Meaning |
+|---|---|
+| `kind` | `point`, `rectangle`, `drawing` (images) · `video_timestamp`, `video_range` (video) |
+| `x` `y` `width` `height` | Bounding box of the markup (kept queryable; older readers still see an anchor) |
+| `timestamp_ms` | A single moment in a video |
+| `start_ms` `end_ms` | A selected portion of a video |
+| `shape_json` | `{"v":1,"shapes":[...]}` — the actual markup (added in migration `0004`) |
 
-No duplicate video is generated when a reviewer comments.
+Shapes are one of `pin`, `rect`, `ellipse`, `arrow`, `pen` and `highlight`, each with a colour (`c`, `#rrggbb`) and
+a size (`s`). The Worker validates them strictly (points inside 0..1, at most 40 shapes, at most 600 points per
+stroke, 64 KB of JSON) before storing anything, and derives the bounding box itself when a client omits it.
+Comments made before this feature (a bare `x`/`y`) are still shown, as pins.
+
+Video markup is attached to a frame: a `video_timestamp` keeps its markup on screen for about a second after the
+moment, and a `video_range` shows it for the whole portion. No duplicate video is generated when a reviewer comments.
+
+Both reviewers (`POST /api/review/:token/comments`) and the designer (`POST /api/assets/:id/comments`) can send
+markup with a comment; replies from the designer are signed with the studio name.
