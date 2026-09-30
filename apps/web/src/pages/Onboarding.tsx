@@ -1,19 +1,104 @@
-import { ArrowRight, Building2, Check, CloudUpload, FolderPlus, Send, UserPlus } from 'lucide-react';
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Brand } from '../components/Brand';
-
-const steps = [
-  { title: 'Set up your workspace', subtitle: 'This is what clients will see on review pages.', icon: Building2 },
-  { title: 'Create your first client', subtitle: 'You can always add more later.', icon: UserPlus },
-  { title: 'Create your first project', subtitle: 'A project groups related content.', icon: FolderPlus },
-  { title: 'Upload your first creative', subtitle: 'Images, carousels, PDFs or video.', icon: CloudUpload },
-  { title: 'Send your first approval request', subtitle: 'One secure review link. No client login.', icon: Send }
-];
+import { FormEvent, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { ArrowRight, Check } from "lucide-react";
+import { Brand } from "../components/Brand";
+import { Field, Notice } from "../components/ui";
+import { api, formBody } from "../lib/api";
+import { useWorkspace } from "../lib/workspace";
 
 export default function Onboarding() {
-  const [step, setStep] = useState(0); const nav = useNavigate();
-  const current = steps[step]; const Icon = current.icon;
-  const next = () => step === steps.length - 1 ? nav('/app/dashboard') : setStep(step + 1);
-  return <div className="onboarding-page"><header><Brand/><button className="text-button" onClick={() => nav('/app/dashboard')}>Skip setup</button></header><div className="onboarding-shell"><aside><div className="eyebrow warm">GET TO YOUR FIRST APPROVAL FAST</div><h1>You're {step + 1} step{step ? 's' : ''} closer.</h1><ol>{steps.map((s, i) => <li className={i === step ? 'active' : i < step ? 'done' : ''} key={s.title}><span>{i < step ? <Check size={15}/> : i + 1}</span>{s.title}</li>)}</ol></aside><section className="onboarding-card"><div className="onboarding-icon"><Icon/></div><div className="step-count">STEP {step + 1} OF {steps.length}</div><h2>{current.title}</h2><p>{current.subtitle}</p>{step === 0 && <><label>Agency / Freelancer name<input defaultValue="Pixel Agency"/></label><label>Brand color<div className="color-row"><button className="swatch selected"/><button className="swatch orange"/><button className="swatch dark"/></div></label></>}{step === 1 && <><label>Company name<input defaultValue="SmileCraft Dental"/></label><label>Contact name<input defaultValue="Dr. Priya Shah"/></label><label>Email address<input defaultValue="priya@smilecraftdental.com"/></label></>}{step === 2 && <><label>Project name<input defaultValue="October Content"/></label><label>Client<select defaultValue="smilecraft"><option value="smilecraft">SmileCraft Dental</option></select></label></>}{step === 3 && <div className="drop-zone"><CloudUpload size={30}/><b>Drop files here</b><span>or click to browse</span><small>PNG, JPG, WEBP, PDF, MP4, MOV</small></div>}{step === 4 && <><label>Reviewer email<input defaultValue="priya@smilecraftdental.com"/></label><label>Message<textarea defaultValue="Hi Priya, October content is ready. Please review and mark any changes directly on the creative."/></label><label className="check"><input type="checkbox" defaultChecked/> Send automatic reminders</label></>}<button className="button button-primary full" onClick={next}>{step === steps.length - 1 ? 'Send approval request' : 'Continue'} <ArrowRight size={16}/></button></section></div></div>;
+  const { workspace, reload } = useWorkspace();
+  const nav = useNavigate();
+  const [step, setStep] = useState(0);
+  const [message, setMessage] = useState("");
+  const [busy, setBusy] = useState(false);
+  const run = async (work: () => Promise<unknown>, next: () => void) => {
+    setBusy(true);
+    setMessage("");
+    try {
+      await work();
+      await reload();
+      next();
+    } catch (err) {
+      setMessage((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const saveWorkspace = (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const { name } = formBody(e.currentTarget);
+    void run(
+      () =>
+        api("/api/workspace", {
+          method: "PATCH",
+          body: JSON.stringify({
+            name,
+            replyToEmail: workspace.reply_to_email,
+            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || workspace.timezone,
+            brandColor: workspace.brand_color,
+          }),
+        }),
+      () => setStep(1),
+    );
+  };
+  const saveClient = (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const body = formBody(e.currentTarget);
+    void run(
+      () => api("/api/clients", { method: "POST", body: JSON.stringify(body) }),
+      () => nav("/app/dashboard"),
+    );
+  };
+  const suggested = workspace.name.endsWith(" Workspace") ? "" : workspace.name;
+  return (
+    <div className="onboarding">
+      <Brand />
+      <div className="onboarding-card card">
+        <ol className="dots" aria-label={`Step ${step + 1} of 2`}>
+          {[0, 1].map((i) => (
+            <li key={i} className={i < step ? "done" : i === step ? "current" : ""}>
+              {i < step ? <Check size={12} strokeWidth={3} /> : i + 1}
+            </li>
+          ))}
+        </ol>
+        {step === 0 ? (
+          <form className="form" onSubmit={saveWorkspace}>
+            <h1>Welcome! What’s your business called?</h1>
+            <p className="muted">Your clients will see this name when they review your work.</p>
+            <Field label="Business or studio name" hint="You can change this later in Settings.">
+              <input name="name" required autoFocus defaultValue={suggested} placeholder="e.g. Pixel & Post Studio" />
+            </Field>
+            <Notice message={message} tone="error" />
+            <button className="button button-primary large full" disabled={busy}>
+              {busy ? "Saving…" : "Continue"} <ArrowRight size={17} />
+            </button>
+          </form>
+        ) : (
+          <form className="form" onSubmit={saveClient}>
+            <h1>Who’s your first client?</h1>
+            <p className="muted">Add one client now — it takes 20 seconds. You can add more later.</p>
+            <Field label="Company or brand name">
+              <input name="companyName" required autoFocus placeholder="e.g. SmileCraft Dental" />
+            </Field>
+            <div className="field-row">
+              <Field label="Contact person">
+                <input name="contactName" required placeholder="Full name" />
+              </Field>
+              <Field label="Their email">
+                <input name="email" type="email" required placeholder="name@company.com" />
+              </Field>
+            </div>
+            <Notice message={message} tone="error" />
+            <button className="button button-primary large full" disabled={busy}>
+              {busy ? "Saving…" : "Add client & finish"} <ArrowRight size={17} />
+            </button>
+            <button type="button" className="button button-ghost full" onClick={() => nav("/app/dashboard")}>
+              Skip for now
+            </button>
+          </form>
+        )}
+      </div>
+    </div>
+  );
 }

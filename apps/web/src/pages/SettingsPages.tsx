@@ -1,12 +1,211 @@
-import { Check, CreditCard, Mail, Palette, ShieldCheck } from 'lucide-react';
-import { useState } from 'react';
-import { PageHeader } from '../components/PageHeader';
-import { Topbar } from '../components/Topbar';
+import { FormEvent, ReactNode, useState } from "react";
+import { Link, NavLink } from "react-router-dom";
+import { Bell, Mail, Send } from "lucide-react";
+import { PlanCards } from "../components/PlanCards";
+import { Field, Notice, PageHeader, ProgressBar } from "../components/ui";
+import { api, formBody } from "../lib/api";
+import { formatBytes } from "../lib/format";
+import { useWorkspace } from "../lib/workspace";
 
-export function WorkspaceSettings(){return <><Topbar/><div className="page-pad narrow"><PageHeader eyebrow="SETTINGS" title="Workspace"/><form className="panel form-panel"><label>Agency name<input defaultValue="Pixel Agency"/></label><label>Reply-to email<input defaultValue="hello@pixelagency.com"/></label><label>Timezone<select defaultValue="Asia/Kolkata"><option>Asia/Kolkata</option><option>America/New_York</option><option>Europe/London</option></select></label><label>Branding<div className="branding-box"><div className="brand-preview"><span className="brand-mark smallmark">✓</span><b>Pixel Agency</b></div><div><button type="button" className="button button-ghost small"><Palette size={15}/> Change logo & colors</button></div></div></label><label>Default reminder schedule<select><option>24 hours, 72 hours, then notify me</option><option>Every 3 days</option><option>Off</option></select></label><button className="button button-primary">Save changes</button></form></div></>}
+const tabs = [
+  ["/app/settings/workspace", "General"],
+  ["/app/settings/notifications", "Notifications"],
+  ["/app/settings/billing", "Plan & billing"],
+  ["/app/storage", "Storage"],
+] as const;
 
-export function NotificationSettings(){const [checks,setChecks]=useState([true,true,true,true,false]); const labels=['Client approves content','Client requests changes','Client leaves a comment','Approval becomes overdue','Client merely views content']; return <><Topbar/><div className="page-pad narrow"><PageHeader eyebrow="SETTINGS" title="Notifications"/><div className="panel form-panel"><div className="settings-intro"><span className="settings-icon"><Mail/></span><div><h2>Email me when…</h2><p>Keep only the alerts that help you act.</p></div></div>{labels.map((label,i)=><label className="toggle-row" key={label}><div><b>{label}</b><span>{i===4?'Usually noisy; off by default.':'Sent to your workspace notification email.'}</span></div><input type="checkbox" checked={checks[i]} onChange={()=>setChecks(v=>v.map((x,j)=>j===i?!x:x))}/></label>)}<button className="button button-primary">Save preferences</button></div></div></>}
+export function SettingsLayout({ children }: { children: ReactNode }) {
+  return (
+    <>
+      <PageHeader title="Settings" />
+      <nav className="tabs settings-tabs" aria-label="Settings">
+        {tabs.map(([to, label]) => (
+          <NavLink key={to} to={to} className={({ isActive }) => (isActive ? "tab active" : "tab")}>
+            {label}
+          </NavLink>
+        ))}
+      </nav>
+      {children}
+    </>
+  );
+}
 
-export function BillingSettings(){return <><Topbar/><div className="page-pad"><PageHeader eyebrow="BILLING" title="Simple plans with storage guardrails"/><div className="plan-grid"><Plan name="Solo" price="₹599" storage="10 GB" items={['5 active clients','Email reminders','Image + video review']}/><Plan featured name="Freelancer" price="₹999" storage="50 GB" items={['20 active clients','White-label logo','50 GB included storage','Priority review links']}/><Plan name="Agency" price="₹1,599" storage="150 GB" items={['Team members','Custom branding','150 GB storage','Higher upload limits']}/></div><div className="panel billing-note"><ShieldCheck/><div><h3>Razorpay billing only</h3><p>Subscription state is updated from verified Razorpay webhooks. Browser success callbacks are never treated as the source of truth.</p></div></div></div></>}
+export const timezones = () =>
+  Array.from(
+    new Set([
+      Intl.DateTimeFormat().resolvedOptions().timeZone,
+      "Asia/Kolkata",
+      "UTC",
+      "Europe/London",
+      "Asia/Dubai",
+      "Asia/Singapore",
+      "America/New_York",
+      "America/Los_Angeles",
+      "Australia/Sydney",
+    ]),
+  );
 
-function Plan({name,price,storage,items,featured=false}:{name:string;price:string;storage:string;items:string[];featured?:boolean}){return <article className={featured?'plan-card featured':'plan-card'}>{featured&&<span className="plan-badge">POPULAR</span>}<div className="eyebrow">{name}</div><h2>{price}<small>/month</small></h2><p>{storage} included storage</p><ul>{items.map(i=><li key={i}><Check size={15}/>{i}</li>)}</ul><button className={featured?'button button-primary full':'button button-ghost full'}><CreditCard size={16}/> Choose {name}</button></article>}
+export function WorkspaceSettings() {
+  const { workspace, reload } = useWorkspace();
+  const [message, setMessage] = useState<{ text: string; ok: boolean }>({ text: "", ok: true });
+  const [busy, setBusy] = useState(false);
+  const submit = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      await api("/api/workspace", { method: "PATCH", body: JSON.stringify(formBody(e.currentTarget)) });
+      await reload();
+      setMessage({ text: "Saved.", ok: true });
+    } catch (err) {
+      setMessage({ text: (err as Error).message, ok: false });
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <SettingsLayout>
+      <form className="card form narrow" onSubmit={submit}>
+        <Field label="Business name" hint="Shown to your clients on review pages and emails.">
+          <input name="name" required defaultValue={workspace.name} />
+        </Field>
+        <Field label="Reply-to email" hint="When clients reply to our emails, it goes here.">
+          <input name="replyToEmail" type="email" required defaultValue={workspace.reply_to_email} />
+        </Field>
+        <Field label="Time zone" hint="Used for deadlines and reminders.">
+          <select name="timezone" defaultValue={workspace.timezone}>
+            {Array.from(new Set([workspace.timezone, ...timezones()])).map((z) => (
+              <option key={z}>{z}</option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Brand colour" hint="Used for your workspace badge.">
+          <input name="brandColor" type="color" className="color-input" defaultValue={workspace.brand_color} />
+        </Field>
+        <Notice message={message.text} tone={message.ok ? "success" : "error"} />
+        <div className="form-actions">
+          <button disabled={busy} className="button button-primary">
+            {busy ? "Saving…" : "Save changes"}
+          </button>
+        </div>
+      </form>
+    </SettingsLayout>
+  );
+}
+
+export function NotificationSettings() {
+  const { workspace } = useWorkspace();
+  return (
+    <SettingsLayout>
+      <div className="card narrow feature-card">
+        <span className={`stat-icon ${workspace.emailEnabled ? "tone-green" : "tone-gray"}`}>
+          {workspace.emailEnabled ? <Mail size={20} /> : <Bell size={20} />}
+        </span>
+        <div>
+          <h2>{workspace.emailEnabled ? "Email is on" : "Share links yourself"}</h2>
+          <p>
+            {workspace.emailEnabled
+              ? "Each time you send for approval, you can choose to email your client and send automatic reminders."
+              : "Email delivery isn’t set up for this workspace yet. You can still send review links over WhatsApp, email or any chat app."}
+          </p>
+          <Link className="button button-primary" to="/app/approvals/new">
+            <Send size={16} /> Send for approval
+          </Link>
+        </div>
+      </div>
+    </SettingsLayout>
+  );
+}
+
+export function BillingSettings() {
+  const { workspace } = useWorkspace();
+  const [message, setMessage] = useState("");
+  const [busy, setBusy] = useState(false);
+  async function choose(plan: string) {
+    setBusy(true);
+    try {
+      const result = await api<{ shortUrl: string }>("/api/billing/subscription", {
+        method: "POST",
+        body: JSON.stringify({ plan }),
+      });
+      if (!result.shortUrl) throw new Error("Checkout link unavailable. Please try again.");
+      window.location.assign(result.shortUrl);
+    } catch (err) {
+      setMessage((err as Error).message);
+      setBusy(false);
+    }
+  }
+  return (
+    <SettingsLayout>
+      <div className="card summary-card">
+        <div>
+          <b className="capitalize">You’re on the {workspace.plan_key} plan</b>
+          <span>
+            {workspace.billingEnabled
+              ? "Upgrade any time — you’ll be taken to a secure checkout."
+              : "Your free trial is active. Paid plans aren’t available yet."}
+          </span>
+        </div>
+      </div>
+      <Notice message={message} tone="error" />
+      <PlanCards
+        action={(plan) =>
+          workspace.plan_key === plan.key ? (
+            <button className="button button-secondary full" disabled>
+              Current plan
+            </button>
+          ) : (
+            <button
+              disabled={busy || !workspace.billingEnabled}
+              className={`button full ${plan.popular ? "button-primary" : "button-secondary"}`}
+              onClick={() => void choose(plan.key)}
+            >
+              {workspace.billingEnabled ? `Choose ${plan.name}` : "Available soon"}
+            </button>
+          )
+        }
+      />
+    </SettingsLayout>
+  );
+}
+
+export function StoragePage() {
+  const { workspace, assets } = useWorkspace();
+  const pct = (workspace.storage_used_bytes / Math.max(1, workspace.storage_quota_bytes)) * 100;
+  const byKind = [
+    ["image", "Images"],
+    ["video", "Videos"],
+    ["pdf", "PDFs"],
+  ].map(([kind, label]) => ({
+    label,
+    bytes: assets.filter((a) => a.kind === kind).reduce((s, a) => s + a.size_bytes, 0),
+    count: assets.filter((a) => a.kind === kind).length,
+  }));
+  return (
+    <SettingsLayout>
+      <section className="card narrow">
+        <h2 className="storage-figure">
+          {formatBytes(workspace.storage_used_bytes)} <span>of {formatBytes(workspace.storage_quota_bytes)} used</span>
+        </h2>
+        <ProgressBar value={pct} label="Storage used" />
+        <p className="muted small">
+          Includes every version you’ve uploaded. Files are private and only visible through your review links.
+        </p>
+        <ul className="storage-list">
+          {byKind.map((k) => (
+            <li key={k.label}>
+              <span>
+                {k.label} <small>({k.count})</small>
+              </span>
+              <b>{formatBytes(k.bytes)}</b>
+            </li>
+          ))}
+        </ul>
+        {pct > 80 && (
+          <Link className="button button-primary" to="/app/settings/billing">
+            Get more storage
+          </Link>
+        )}
+      </section>
+    </SettingsLayout>
+  );
+}

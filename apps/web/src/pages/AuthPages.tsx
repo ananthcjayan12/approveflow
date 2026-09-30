@@ -1,23 +1,97 @@
-import { ArrowRight, Mail, ShieldCheck } from 'lucide-react';
-import { FormEvent } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { Brand } from '../components/Brand';
+import { FormEvent, useState } from "react";
+import { Link, Navigate, useNavigate } from "react-router-dom";
+import { Check, Eye, EyeOff } from "lucide-react";
+import { Brand } from "../components/Brand";
+import { Field, Notice } from "../components/ui";
+import { api } from "../lib/api";
 
-function AuthFrame({ children, note }: { children: React.ReactNode; note: string }) {
-  return <div className="auth-page"><div className="auth-brand-panel"><Brand/><div className="auth-quote"><div className="eyebrow warm">CREATIVE WORK FLOWS FASTER TOGETHER</div><h2>{note}</h2><p>No spreadsheets. No screenshot chains. No “did you approve this?” messages.</p></div></div><div className="auth-card-wrap">{children}</div></div>;
-}
-
-export function Signup() {
+function Auth({ signup = false }: { signup?: boolean }) {
   const nav = useNavigate();
-  const submit = (e: FormEvent) => { e.preventDefault(); nav('/verify'); };
-  return <AuthFrame note="Less chasing. More creating."><form className="auth-card" onSubmit={submit}><Brand compact/><h1>Create your account</h1><p>Start organizing client approvals in minutes.</p><button type="button" className="oauth">Continue with Google</button><div className="divider"><span>or</span></div><label>Full name<input required defaultValue="Ananth Jayan" /></label><label>Work email<input required type="email" defaultValue="hello@pixelagency.com" /></label><label>Password<input required type="password" defaultValue="password123" /></label><button className="button button-primary full">Create account</button><small>Already have an account? <Link to="/login">Log in</Link></small></form></AuthFrame>;
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [show, setShow] = useState(false);
+  const submit = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setBusy(true);
+    setError("");
+    const form = new FormData(e.currentTarget);
+    try {
+      await api(`/api/auth/${signup ? "signup" : "login"}`, {
+        method: "POST",
+        body: JSON.stringify(Object.fromEntries(form)),
+      });
+      nav(signup ? "/onboarding" : "/app/dashboard");
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="auth">
+      <div className="auth-main">
+        <Link to="/">
+          <Brand />
+        </Link>
+        <form className="auth-form form" onSubmit={submit}>
+          <h1>{signup ? "Create your free account" : "Welcome back"}</h1>
+          <p className="muted">
+            {signup ? "Start your free trial. No credit card needed." : "Log in to see your approvals."}
+          </p>
+          {signup && (
+            <Field label="Your name">
+              <input name="name" required maxLength={100} autoComplete="name" autoFocus />
+            </Field>
+          )}
+          <Field label="Email">
+            <input name="email" required type="email" autoComplete="email" autoFocus={!signup} />
+          </Field>
+          <Field label="Password" hint={signup ? "At least 8 characters." : undefined}>
+            <span className="password">
+              <input
+                name="password"
+                required
+                minLength={8}
+                maxLength={200}
+                type={show ? "text" : "password"}
+                autoComplete={signup ? "new-password" : "current-password"}
+              />
+              <button
+                type="button"
+                className="icon-button ghost"
+                aria-label={show ? "Hide password" : "Show password"}
+                onClick={() => setShow(!show)}
+              >
+                {show ? <EyeOff size={17} /> : <Eye size={17} />}
+              </button>
+            </span>
+          </Field>
+          <Notice message={error} tone="error" />
+          <button disabled={busy} className="button button-primary large full">
+            {busy ? "Please wait…" : signup ? "Create account" : "Log in"}
+          </button>
+          <p className="muted center small">
+            {signup ? "Already have an account?" : "New to ApproveFlow?"}{" "}
+            <Link className="link" to={signup ? "/login" : "/signup"}>
+              {signup ? "Log in" : "Create a free account"}
+            </Link>
+          </p>
+        </form>
+      </div>
+      <aside className="auth-aside">
+        <div>
+          <h2>Client approvals, finally simple.</h2>
+          <ul className="checks light">
+            <li><Check size={18} /> Send posts, reels and designs in one link</li>
+            <li><Check size={18} /> Clients approve without creating an account</li>
+            <li><Check size={18} /> Comments pinned right where changes are needed</li>
+            <li><Check size={18} /> Know exactly what’s approved — and what’s not</li>
+          </ul>
+        </div>
+      </aside>
+    </div>
+  );
 }
-
-export function Login() {
-  const nav = useNavigate();
-  return <AuthFrame note="Everything your client needs. Nothing they don't."><form className="auth-card" onSubmit={(e) => {e.preventDefault(); nav('/app/dashboard');}}><Brand compact/><h1>Welcome back</h1><p>Sign in to your agency workspace.</p><label>Email<input type="email" defaultValue="hello@pixelagency.com"/></label><label>Password<input type="password" defaultValue="password123"/></label><div className="form-row between"><label className="check"><input type="checkbox" defaultChecked/> Remember me</label><a href="#">Forgot password?</a></div><button className="button button-primary full">Log in</button><small>New here? <Link to="/signup">Create an account</Link></small></form></AuthFrame>;
-}
-
-export function Verify() {
-  return <div className="center-page dark"><div className="verify-card"><div className="verify-icon"><Mail size={34}/><span><ShieldCheck size={18}/></span></div><div className="eyebrow warm">ONE MORE STEP</div><h1>Check your email</h1><p>We sent a verification link to <b>hello@pixelagency.com</b>.</p><Link className="button button-primary full" to="/onboarding">I verified my email <ArrowRight size={16}/></Link><small>Didn't receive it? <a href="#">Resend</a></small></div></div>;
-}
+export const Signup = () => <Auth signup />;
+export const Login = () => <Auth />;
+export const Verify = () => <Navigate to="/onboarding" replace />;

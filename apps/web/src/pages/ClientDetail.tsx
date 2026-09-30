@@ -1,11 +1,75 @@
-import { Edit3, Plus } from 'lucide-react';
-import { Link, useParams } from 'react-router-dom';
-import { MetricCard } from '../components/MetricCard';
-import { StatusPill } from '../components/StatusPill';
-import { Topbar } from '../components/Topbar';
-import { clients, projects } from '../lib/demo';
+import { FolderPlus, Mail, Pencil, Plus, User, Users } from "lucide-react";
+import { Link, useParams } from "react-router-dom";
+import { ProjectRow } from "../components/ProjectRow";
+import { Avatar, EmptyState, PageHeader } from "../components/ui";
+import { useWorkspace } from "../lib/workspace";
 
 export default function ClientDetail() {
-  const { id } = useParams(); const client = clients.find(c => c.id === id) || clients[0]; const mine = projects.filter(p => p.clientId === client.id);
-  return <><Topbar/><div className="page-pad"><div className="client-hero"><div className="client-badge big">{client.name.split(' ').map(x=>x[0]).slice(0,2).join('')}</div><div className="grow"><div className="eyebrow">CLIENT</div><h1>{client.name}</h1><p>{client.contact} · {client.email}</p></div><button className="button button-ghost"><Edit3 size={16}/> Edit client</button></div><div className="metrics-grid"><MetricCard value={client.projects} label="Active projects"/><MetricCard value={4} label="Waiting approvals"/><MetricCard value={18} label="Approved"/><MetricCard value={2} label="Changes requested"/></div><section className="panel"><div className="panel-head"><div><h2>Projects</h2><p>{client.note || 'Projects and approval history for this client.'}</p></div><Link className="button button-primary small" to="/app/projects/new"><Plus size={15}/> New project</Link></div><div className="list-table">{mine.length ? mine.map(p => <Link key={p.id} to={`/app/projects/${p.id}`} className="project-row"><div className="thumb-letter">{p.name[0]}</div><div className="grow"><b>{p.name}</b><span>{p.approved+p.changes+p.waiting} assets · due {p.due}</span></div><StatusPill status={p.status}/></Link>) : <div className="empty-inline">No projects yet.</div>}</div></section></div></>;
+  const { id } = useParams();
+  const { clients, projects } = useWorkspace();
+  const client = clients.find((c) => c.id === id);
+  if (!client)
+    return (
+      <EmptyState
+        icon={<Users size={26} />}
+        title="Client not found"
+        body="It may have been removed."
+        action={<Link className="button button-secondary" to="/app/clients">Back to clients</Link>}
+      />
+    );
+  const mine = projects.filter((p) => p.client_id === id);
+  return (
+    <>
+      <PageHeader
+        back={{ to: "/app/clients", label: "Clients" }}
+        title={
+          <span className="title-with-avatar">
+            <Avatar name={client.company_name} size="lg" /> {client.company_name}
+          </span>
+        }
+        action={
+          <Link className="button button-secondary" to={`/app/clients/${id}/edit`}>
+            <Pencil size={15} /> Edit
+          </Link>
+        }
+      />
+      <div className="meta-row">
+        <span>
+          <User size={15} /> {client.contact_name}
+        </span>
+        <a href={`mailto:${client.email}`}>
+          <Mail size={15} /> {client.email}
+        </a>
+      </div>
+      {client.notes && <p className="note-box">{client.notes}</p>}
+      <section className="card">
+        <div className="card-head">
+          <h2>Projects</h2>
+          {mine.length > 0 && (
+            <Link className="button button-primary small" to={`/app/projects/new?client=${id}`}>
+              <Plus size={15} /> New project
+            </Link>
+          )}
+        </div>
+        {mine.length ? (
+          <div className="list">
+            {mine.map((p) => (
+              <ProjectRow key={p.id} project={p} showClient={false} />
+            ))}
+          </div>
+        ) : (
+          <EmptyState
+            icon={<FolderPlus size={26} />}
+            title="No projects yet"
+            body={`Create a project to start uploading content for ${client.company_name}.`}
+            action={
+              <Link className="button button-primary" to={`/app/projects/new?client=${id}`}>
+                <Plus size={16} /> Create a project
+              </Link>
+            }
+          />
+        )}
+      </section>
+    </>
+  );
 }

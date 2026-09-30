@@ -1,14 +1,156 @@
-import { Plus, Search } from 'lucide-react';
-import { Link } from 'react-router-dom';
-import { PageHeader } from '../components/PageHeader';
-import { StatusPill } from '../components/StatusPill';
-import { Topbar } from '../components/Topbar';
-import { clients, projects } from '../lib/demo';
+import { FormEvent, useState } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { FolderOpen, Plus, Search, UserPlus } from "lucide-react";
+import { ProjectRow } from "../components/ProjectRow";
+import { EmptyState, Field, Notice, PageHeader } from "../components/ui";
+import { api, formBody } from "../lib/api";
+import { useWorkspace } from "../lib/workspace";
 
 export function ProjectsList() {
-  return <><Topbar/><div className="page-pad"><PageHeader eyebrow="CAMPAIGNS" title="Projects" action={<Link to="/app/projects/new" className="button button-primary"><Plus size={16}/> New project</Link>}/><div className="panel"><div className="toolbar"><div className="search wide"><Search size={17}/><input placeholder="Search projects…"/></div><select><option>All clients</option></select><select><option>All statuses</option></select></div><div className="table-grid"><div className="table-head"><span>Project</span><span>Client</span><span>Assets</span><span>Due</span><span>Status</span></div>{projects.map(p => { const c=clients.find(x=>x.id===p.clientId)!; return <Link to={`/app/projects/${p.id}`} className="table-row" key={p.id}><b>{p.name}</b><span>{c.name}</span><span>{p.approved+p.changes+p.waiting}</span><span>{p.due}</span><StatusPill status={p.status}/></Link>})}</div></div></div></>;
+  const { projects, clients } = useWorkspace();
+  const [query, setQuery] = useState("");
+  const shown = projects.filter((p) =>
+    `${p.name} ${p.company_name}`.toLowerCase().includes(query.toLowerCase()),
+  );
+  return (
+    <>
+      <PageHeader
+        title="Projects"
+        description="Each project holds the content for one campaign, month or launch."
+        action={
+          projects.length > 0 && (
+            <Link className="button button-primary" to="/app/projects/new">
+              <Plus size={17} /> New project
+            </Link>
+          )
+        }
+      />
+      {projects.length === 0 ? (
+        <div className="card">
+          <EmptyState
+            icon={<FolderOpen size={26} />}
+            title="Create your first project"
+            body={
+              clients.length
+                ? "Group your content — like “October posts” or “Diwali campaign” — and send it for approval together."
+                : "First add a client, then create a project for their content."
+            }
+            action={
+              clients.length ? (
+                <Link className="button button-primary" to="/app/projects/new">
+                  <Plus size={17} /> New project
+                </Link>
+              ) : (
+                <Link className="button button-primary" to="/app/clients/new">
+                  <UserPlus size={17} /> Add a client first
+                </Link>
+              )
+            }
+          />
+        </div>
+      ) : (
+        <>
+          {projects.length > 5 && (
+            <div className="search inline-search">
+              <Search size={17} />
+              <input
+                type="search"
+                aria-label="Filter projects"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Filter projects…"
+              />
+            </div>
+          )}
+          <div className="card list">
+            {shown.map((p) => (
+              <ProjectRow key={p.id} project={p} />
+            ))}
+            {!shown.length && <p className="muted pad">No projects match “{query}”.</p>}
+          </div>
+        </>
+      )}
+    </>
+  );
 }
 
 export function ProjectForm() {
- return <><Topbar/><div className="page-pad narrow"><PageHeader eyebrow="PROJECT" title="Create a new project"/><form className="panel form-panel"><label>Project name<input placeholder="October Content"/></label><label>Client<select><option>SmileCraft Dental</option><option>Milano Trips</option></select></label><label>Description<textarea placeholder="What is this campaign for?"/></label><div className="form-grid"><label>Due date<input type="date"/></label><label>Approval mode<select><option>Approve each item</option><option>Approve entire campaign</option></select></label></div><div className="form-actions"><Link to="/app/projects" className="button button-ghost">Cancel</Link><Link to="/app/projects/october" className="button button-primary">Create project</Link></div></form></div></>;
+  const { clients, reload } = useWorkspace();
+  const [params] = useSearchParams();
+  const nav = useNavigate();
+  const [message, setMessage] = useState("");
+  const [busy, setBusy] = useState(false);
+  const submit = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      const p = await api<{ id: string }>("/api/projects", {
+        method: "POST",
+        body: JSON.stringify(formBody(e.currentTarget)),
+      });
+      await reload();
+      nav(`/app/projects/${p.id}`);
+    } catch (e) {
+      setMessage((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const preset = params.get("client");
+  return (
+    <>
+      <PageHeader
+        title="New project"
+        description="Give it a name your client will recognise."
+        back={preset ? { to: `/app/clients/${preset}`, label: "Client" } : { to: "/app/projects", label: "Projects" }}
+      />
+      {!clients.length ? (
+        <div className="card">
+          <EmptyState
+            icon={<UserPlus size={26} />}
+            title="Add a client first"
+            body="Every project belongs to a client, so we know who to send it to."
+            action={
+              <Link className="button button-primary" to="/app/clients/new">
+                Add a client
+              </Link>
+            }
+          />
+        </div>
+      ) : (
+        <form className="card form narrow" onSubmit={submit}>
+          <Field label="Project name" hint="For example: October posts, Diwali campaign">
+            <input name="name" required autoFocus />
+          </Field>
+          <Field label="Which client is this for?">
+            <select name="clientId" defaultValue={preset || clients[0].id}>
+              {clients.map((c) => (
+                <option value={c.id} key={c.id}>
+                  {c.company_name}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Link className="link small" to="/app/clients/new">
+            <Plus size={14} /> Add a new client instead
+          </Link>
+          <Field label="Approval deadline" optional hint="When do you need the client’s decision?">
+            <input name="dueAt" type="date" />
+          </Field>
+          <Field label="Description" optional>
+            <textarea name="description" rows={3} placeholder="What’s this project about?" />
+          </Field>
+          <Notice message={message} tone="error" />
+          <div className="form-actions">
+            <Link className="button button-ghost" to="/app/projects">
+              Cancel
+            </Link>
+            <button disabled={busy} className="button button-primary">
+              {busy ? "Creating…" : "Create project"}
+            </button>
+          </div>
+        </form>
+      )}
+    </>
+  );
 }

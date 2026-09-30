@@ -1,12 +1,37 @@
-import { CheckCircle2, Eye, Mail, MessageSquare, RefreshCw } from 'lucide-react';
-import { PageHeader } from '../components/PageHeader';
-import { Topbar } from '../components/Topbar';
+import { Activity } from "lucide-react";
+import { ActivityFeed } from "../components/ActivityFeed";
+import { EmptyState, PageHeader } from "../components/ui";
+import { dayLabel } from "../lib/format";
+import { EventRow, useWorkspace } from "../lib/workspace";
 
-const rows=[
-  [CheckCircle2,'Dr. Priya approved Instagram Post 1','SmileCraft · October Content','18 min ago'],
-  [MessageSquare,'Dr. Priya requested changes on Carousel','2 visual annotations','24 min ago'],
-  [Eye,'Rohan viewed Diwali Campaign','Milano Trips','52 min ago'],
-  [Mail,'Reminder sent','SmileCraft · 2 items waiting','1 hour ago'],
-  [RefreshCw,'Version 2 uploaded','Summer Collection','3 hours ago']
-] as const;
-export default function ActivityPage(){return <><Topbar/><div className="page-pad"><PageHeader eyebrow="AUDIT TRAIL" title="Activity"/><div className="panel activity-page-list">{rows.map(([Icon,title,sub,time])=><div className="activity-row" key={title}><span className="activity-icon"><Icon/></span><div className="grow"><b>{title}</b><span>{sub}</span></div><time>{time}</time></div>)}</div></div></>}
+export default function ActivityPage() {
+  const { events } = useWorkspace();
+  const groups = events.reduce<Array<{ day: string; items: EventRow[] }>>((acc, e) => {
+    const day = dayLabel(e.created_at);
+    const last = acc[acc.length - 1];
+    if (last?.day === day) last.items.push(e);
+    else acc.push({ day, items: [e] });
+    return acc;
+  }, []);
+  return (
+    <>
+      <PageHeader title="Activity" description="Everything that’s happened across your clients and projects." />
+      {groups.length ? (
+        groups.map((g) => (
+          <section key={g.day} className="card activity-group">
+            <h3 className="group-label">{g.day}</h3>
+            <ActivityFeed events={g.items} />
+          </section>
+        ))
+      ) : (
+        <div className="card">
+          <EmptyState
+            icon={<Activity size={26} />}
+            title="No activity yet"
+            body="When you upload content or your clients approve and comment, it’ll show up here."
+          />
+        </div>
+      )}
+    </>
+  );
+}

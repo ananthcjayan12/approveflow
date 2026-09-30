@@ -3,11 +3,14 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+
 permissions:
   contents: read
+
 concurrency:
   group: approveflow-production
   cancel-in-progress: false
+
 jobs:
   deploy:
     if: github.ref == 'refs/heads/main'
@@ -19,18 +22,42 @@ jobs:
         with:
           node-version: '22'
           cache: npm
-      - run: npm install --no-audit --no-fund
+
+      - run: npm ci --no-audit --no-fund
       - run: npm run typecheck
       - run: npm run test
       - run: npm run build
-      - name: Apply D1 migrations and deploy
+      - run: npm run test:trial
+
+      # Everything is read from GitHub Actions secrets. Non-sensitive settings may
+      # alternatively be stored as repository variables with the same name.
+      - name: Provision Cloudflare resources, migrate, and deploy
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          RAZORPAY_KEY_ID: ${{ secrets.RAZORPAY_KEY_ID }}
+          RAZORPAY_KEY_SECRET: ${{ secrets.RAZORPAY_KEY_SECRET }}
+          RAZORPAY_WEBHOOK_SECRET: ${{ secrets.RAZORPAY_WEBHOOK_SECRET }}
+
+          WORKER_NAME: ${{ secrets.WORKER_NAME || vars.WORKER_NAME }}
+          D1_DATABASE_NAME: ${{ secrets.D1_DATABASE_NAME || vars.D1_DATABASE_NAME }}
+          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME || vars.R2_BUCKET_NAME }}
+          APP_ORIGIN: ${{ secrets.APP_ORIGIN || vars.APP_ORIGIN }}
+          EMAIL_FROM: ${{ secrets.EMAIL_FROM || vars.EMAIL_FROM }}
+          MAX_SINGLE_UPLOAD_BYTES: ${{ secrets.MAX_SINGLE_UPLOAD_BYTES || vars.MAX_SINGLE_UPLOAD_BYTES }}
+          MAX_VIDEO_BYTES: ${{ secrets.MAX_VIDEO_BYTES || vars.MAX_VIDEO_BYTES }}
+          DEFAULT_STORAGE_QUOTA_BYTES: ${{ secrets.DEFAULT_STORAGE_QUOTA_BYTES || vars.DEFAULT_STORAGE_QUOTA_BYTES }}
+          RAZORPAY_PLAN_SOLO: ${{ secrets.RAZORPAY_PLAN_SOLO || vars.RAZORPAY_PLAN_SOLO }}
+          RAZORPAY_PLAN_FREELANCER: ${{ secrets.RAZORPAY_PLAN_FREELANCER || vars.RAZORPAY_PLAN_FREELANCER }}
+          RAZORPAY_PLAN_AGENCY: ${{ secrets.RAZORPAY_PLAN_AGENCY || vars.RAZORPAY_PLAN_AGENCY }}
         run: |
-          npx wrangler d1 migrations apply DB --remote
-          npx wrangler deploy
-      - name: Production smoke test
-        env:
-          APP_ORIGIN: ${{ vars.APP_ORIGIN }}
-        run: node scripts/smoke-test.mjs
+          npm run deploy:prepare
+          npx --no-install wrangler d1 migrations apply DB --remote --config wrangler.generated.json
+          npm run deploy
+
+      - name: Verify public deployment
+        run: node scripts/cloudflare/smoke-test.mjs

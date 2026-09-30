@@ -1,9 +1,77 @@
-import { ArrowLeft, Check, Download, MessageSquare, RotateCcw } from 'lucide-react';
-import { Link, useParams } from 'react-router-dom';
-import { StatusPill } from '../components/StatusPill';
-import { assets } from '../lib/demo';
+import { useCallback, useEffect, useState } from "react";
+import { Link, useParams } from "react-router-dom";
+import { Image as ImageIcon, Send, Upload } from "lucide-react";
+import { FeedbackPanel } from "../components/FeedbackPanel";
+import { EmptyState, Notice, PageHeader, StatusBadge } from "../components/ui";
+import { api } from "../lib/api";
+import { kindLabel } from "../lib/format";
+import { CommentRow, useWorkspace } from "../lib/workspace";
 
 export default function AgencyAssetReview() {
-  const { id }=useParams(); const asset=assets.find(a=>a.id===id)||assets[1];
-  return <div className="review-workspace agency-review"><header><Link to="/app/projects/october"><ArrowLeft/> Back to project</Link><div><StatusPill status={asset.status}/><button className="icon-button"><Download/></button></div></header><main><section className="review-canvas"><div className="review-title"><div><div className="eyebrow">{asset.kind.toUpperCase()} · VERSION 2</div><h1>{asset.name}</h1></div><button className="button button-primary small"><Check size={16}/> Mark approved</button></div><div className="media-frame">{asset.kind==='video'?<video src={asset.src} controls/>:<img src={asset.src} alt=""/>}<span className="pin pin-one">1</span><span className="pin pin-two">2</span></div><div className="version-strip"><button className="active">V2 · current</button><button>V1 · changes requested</button><button><RotateCcw size={15}/> Compare</button></div></section><aside className="comment-panel"><div className="comment-tabs"><button className="active">Comments (3)</button><button>Activity</button></div><div className="thread"><div className="comment"><span className="avatar xsmall">P</span><div><b>Dr. Priya</b><time>18 min ago</time><p>Can we make the phone number larger here?</p><span className="comment-ref">Marker 1</span></div></div><div className="comment"><span className="avatar xsmall dark">A</span><div><b>You</b><time>12 min ago</time><p>Yes — I'll update this in V3.</p></div></div><div className="comment"><span className="avatar xsmall">P</span><div><b>Dr. Priya</b><time>9 min ago</time><p>The headline can move slightly upward.</p><span className="comment-ref">Marker 2</span></div></div></div><div className="comment-compose"><MessageSquare size={18}/><input placeholder="Reply to feedback…"/><button>Send</button></div></aside></main></div>;
+  const { id } = useParams();
+  const { assets, projects } = useWorkspace();
+  const asset = assets.find((a) => a.id === id);
+  const project = projects.find((p) => p.id === asset?.project_id);
+  const [comments, setComments] = useState<CommentRow[]>([]);
+  const [message, setMessage] = useState("");
+  const load = useCallback(async () => {
+    setComments(await api<CommentRow[]>(`/api/assets/${id}/comments`));
+  }, [id]);
+  useEffect(() => {
+    void load().catch((e) => setMessage(e.message));
+  }, [load]);
+  if (!asset)
+    return (
+      <EmptyState
+        icon={<ImageIcon size={26} />}
+        title="File not found"
+        body="It may have been removed."
+        action={<Link className="button button-secondary" to="/app/projects">Back to projects</Link>}
+      />
+    );
+  const needsChanges = asset.status === "changes_requested";
+  const draft = asset.status === "draft";
+  return (
+    <>
+      <PageHeader
+        back={project ? { to: `/app/projects/${project.id}`, label: project.name } : { to: "/app/projects", label: "Projects" }}
+        title={asset.name}
+        description={
+          <span className="inline-meta">
+            <StatusBadge status={asset.status} />
+            {kindLabel[asset.kind] ?? asset.kind} · Version {asset.latest_version_no}
+          </span>
+        }
+        action={
+          <>
+            <Link
+              className={`button ${needsChanges ? "button-primary" : "button-secondary"}`}
+              to={`/app/upload?asset=${id}`}
+            >
+              <Upload size={16} /> Upload new version
+            </Link>
+            {draft && (
+              <Link className="button button-primary" to={`/app/approvals/new?project=${asset.project_id}&assets=${id}`}>
+                <Send size={16} /> Send for approval
+              </Link>
+            )}
+          </>
+        }
+      />
+      {needsChanges && (
+        <p className="hint-box warn">
+          Your client asked for changes. Read their comments, then upload a new version — they’ll see it on the same link.
+        </p>
+      )}
+      <Notice message={message} tone="error" />
+      <FeedbackPanel
+        key={asset.version_id}
+        asset={asset}
+        comments={comments}
+        canComment={!draft}
+        disabledReason="Send this file for approval to start a conversation with your client."
+        onSave={load}
+      />
+    </>
+  );
 }
