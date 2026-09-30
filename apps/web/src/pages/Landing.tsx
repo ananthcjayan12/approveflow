@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import {
   ArrowRight,
   BellRing,
@@ -20,13 +20,14 @@ import { Link } from "react-router-dom";
 import { Brand } from "../components/Brand";
 import { PlanCards } from "../components/PlanCards";
 import { ThemeToggle } from "../components/ThemeToggle";
-import { MOCK_TOOLS, MarkupArt, ReviewMock, TimelineArt } from "../components/marketing/Mock";
+import { HowApprove, HowLink, HowUpload, MarkupLive, PortionLive } from "../components/marketing/LiveArt";
+import { ProductTour } from "../components/marketing/ProductTour";
 import { SiteAuthLinks, useSignedInUi } from "../components/marketing/SiteAuthLinks";
 
 const steps = [
-  { Icon: UploadCloud, title: "Upload your content", body: "Drag in images, carousels, videos or PDFs. Everything stays private." },
-  { Icon: Send, title: "Send one link", body: "Share it on WhatsApp or email. Your client never needs an account." },
-  { Icon: Check, title: "Get it approved", body: "They approve, or point, draw and comment on exactly what to change." },
+  { Icon: UploadCloud, Art: HowUpload, title: "Upload your content", body: "Drag in images, carousels, videos or PDFs. Everything stays private." },
+  { Icon: Send, Art: HowLink, title: "Send one link", body: "Share it on WhatsApp or email. Your client never needs an account." },
+  { Icon: Check, Art: HowApprove, title: "Get it approved", body: "They approve, or point, draw and comment on exactly what to change." },
 ];
 
 const faqs = [
@@ -63,6 +64,34 @@ const nav = [
   ["FAQ", "#faq"],
 ] as const;
 
+/** Fades sections in as they scroll into view. Content stays visible without JS or with reduced motion. */
+function useReveal() {
+  useEffect(() => {
+    if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const timers: number[] = [];
+    const io = new IntersectionObserver(
+      (entries) =>
+        entries.forEach((e) => {
+          if (!e.isIntersecting) return;
+          const el = e.target as HTMLElement;
+          el.classList.add("in");
+          io.unobserve(el);
+          // Hand hover transitions back to the element's own styles once it has settled.
+          timers.push(window.setTimeout(() => el.classList.remove("reveal", "in"), 1400));
+        }),
+      { threshold: 0.12, rootMargin: "0px 0px -6% 0px" },
+    );
+    document.querySelectorAll<HTMLElement>("[data-reveal]").forEach((el) => {
+      el.classList.add("reveal");
+      io.observe(el);
+    });
+    return () => {
+      io.disconnect();
+      timers.forEach(clearTimeout);
+    };
+  }, []);
+}
+
 export default function Landing() {
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
@@ -73,6 +102,8 @@ export default function Landing() {
     window.addEventListener("scroll", on, { passive: true });
     return () => window.removeEventListener("scroll", on);
   }, []);
+
+  useReveal();
 
   return (
     <div className="site">
@@ -129,55 +160,48 @@ export default function Landing() {
             <li><Check size={16} /> Works on phone &amp; tablet</li>
           </ul>
         </div>
-        <ReviewMock />
+        <ProductTour />
       </section>
 
       <section className="section" id="features">
-        <div className="section-head">
+        <div className="section-head" data-reveal>
           <span className="eyebrow">Features</span>
           <h2>Everything a review needs. Nothing it doesn’t.</h2>
           <p>Built for social media managers and small studios who are tired of vague feedback.</p>
         </div>
         <div className="bento">
-          <article className="bento-card bento-a">
+          <article className="bento-card bento-a" data-reveal>
             <div className="bento-text">
               <span className="stat-icon tone-primary"><Pencil size={20} /></span>
               <h3>Mark up anything</h3>
               <p>Pins, freehand pen, highlighter, boxes, circles and arrows — in any colour. Clients zoom in and show you precisely what they mean.</p>
             </div>
-            <div className="bento-visual art-stage">
-              <div className="art-tools">
-                {MOCK_TOOLS.map((Icon, i) => (
-                  <b key={i} className={i === 2 ? "on" : ""}><Icon size={15} /></b>
-                ))}
-              </div>
-              <MarkupArt />
-            </div>
+            <MarkupLive />
           </article>
-          <article className="bento-card bento-b">
+          <article className="bento-card bento-b" data-reveal>
             <div className="bento-text">
               <span className="stat-icon tone-blue"><SquareDashedMousePointer size={20} /></span>
               <h3>Comment on a moment — or a portion</h3>
               <p>Drag along the timeline to select part of a video, then see only the comments inside it.</p>
             </div>
-            <TimelineArt />
+            <PortionLive />
           </article>
-          <article className="bento-card bento-c">
+          <article className="bento-card bento-c" data-reveal>
             <span className="stat-icon tone-green"><UserX size={20} /></span>
             <h3>No client logins</h3>
             <p>Clients open a link and review. No passwords, no app to install.</p>
           </article>
-          <article className="bento-card bento-c">
+          <article className="bento-card bento-c" data-reveal>
             <span className="stat-icon tone-amber"><History size={20} /></span>
             <h3>Every version, tracked</h3>
             <p>Upload a fix and the client sees it on the same link.</p>
           </article>
-          <article className="bento-card bento-c">
+          <article className="bento-card bento-c" data-reveal>
             <span className="stat-icon tone-red"><BellRing size={20} /></span>
             <h3>Friendly reminders</h3>
             <p>Automatic nudges so you never have to chase anyone.</p>
           </article>
-          <article className="bento-card bento-c">
+          <article className="bento-card bento-c" data-reveal>
             <span className="stat-icon tone-gray"><Lock size={20} /></span>
             <h3>Private by default</h3>
             <p>Files stay in private storage; only your link opens them.</p>
@@ -195,24 +219,25 @@ export default function Landing() {
       </section>
 
       <section className="section" id="how">
-        <div className="section-head">
+        <div className="section-head" data-reveal>
           <span className="eyebrow">How it works</span>
           <h2>Three steps. That’s it.</h2>
         </div>
         <ol className="how-grid">
-          {steps.map(({ Icon, title, body }, i) => (
-            <li key={title} className="how-card">
+          {steps.map(({ Icon, Art, title, body }, i) => (
+            <li key={title} className="how-card" data-reveal style={{ "--i": i } as CSSProperties}>
               <span className="how-num">{i + 1}</span>
               <span className="stat-icon tone-primary"><Icon size={22} /></span>
               <h3>{title}</h3>
               <p>{body}</p>
+              <Art />
             </li>
           ))}
         </ol>
       </section>
 
       <section className="section" id="pricing">
-        <div className="section-head">
+        <div className="section-head" data-reveal>
           <span className="eyebrow">Pricing</span>
           <h2>Simple plans. Start free.</h2>
           <p>Try everything free, then pick the plan that fits. Cancel any time.</p>
@@ -227,7 +252,7 @@ export default function Landing() {
       </section>
 
       <section className="section narrow" id="faq">
-        <div className="section-head">
+        <div className="section-head" data-reveal>
           <span className="eyebrow">FAQ</span>
           <h2>Questions, answered</h2>
         </div>
@@ -243,7 +268,7 @@ export default function Landing() {
         </div>
       </section>
 
-      <section className="cta-band">
+      <section className="cta-band" data-reveal>
         <h2>Spend less time chasing, more time creating.</h2>
         <p>Start your free trial today. Your first approval can go out in the next five minutes.</p>
         <Link className="button button-white large" to="/signup">
