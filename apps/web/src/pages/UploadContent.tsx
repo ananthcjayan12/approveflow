@@ -1,16 +1,1 @@
-import { CheckCircle2, CloudUpload, FileImage, Film, Loader2, Plus, X } from 'lucide-react';
-import { ChangeEvent, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { PageHeader } from '../components/PageHeader';
-import { Topbar } from '../components/Topbar';
-import { uploadFile } from '../lib/api';
-
-type PendingFile={file:File;progress:number;status:'ready'|'uploading'|'done'|'error'};
-export default function UploadContent(){
-  const [files,setFiles]=useState<PendingFile[]>([]); const [message,setMessage]=useState('');
-  const add=(e:ChangeEvent<HTMLInputElement>)=>{const picked=[...(e.target.files||[])].map(file=>({file,progress:0,status:'ready' as const})); setFiles(v=>[...v,...picked]);};
-  const upload=async()=>{setMessage(''); for(let i=0;i<files.length;i++){if(files[i].status==='done')continue; setFiles(v=>v.map((x,j)=>j===i?{...x,status:'uploading'}:x)); try{await uploadFile(files[i].file,p=>setFiles(v=>v.map((x,j)=>j===i?{...x,progress:p}:x))); setFiles(v=>v.map((x,j)=>j===i?{...x,status:'done',progress:100}:x));}catch(e){console.warn(e); // Visual demo fallback when Worker/R2 is not configured yet.
-      for(const p of [25,55,80,100]){await new Promise(r=>setTimeout(r,180)); setFiles(v=>v.map((x,j)=>j===i?{...x,progress:p,status:p===100?'done':'uploading'}:x));}
-    }} setMessage('Files are ready. In production, large videos use direct multipart R2 uploads.');};
-  return <><Topbar/><div className="page-pad"><PageHeader eyebrow="OCTOBER CONTENT" title="Upload creative content" action={<Link className="button button-ghost" to="/app/projects/october">Back to project</Link>}/><div className="upload-layout"><section className="panel upload-panel"><label className="drop-zone interactive"><CloudUpload size={34}/><b>Drop files here or click to browse</b><span>Images, PDFs, carousels and video</span><small>Large videos are uploaded directly to private R2 in resumable parts.</small><input type="file" multiple accept="image/*,video/*,.pdf" onChange={add}/></label>{files.length>0&&<div className="upload-queue">{files.map((item,i)=><div className="upload-row" key={`${item.file.name}-${i}`}><span className="file-icon">{item.file.type.startsWith('video/')?<Film/>:<FileImage/>}</span><div className="grow"><b>{item.file.name}</b><span>{(item.file.size/1024/1024).toFixed(1)} MB</span><div className="upload-progress"><span style={{width:`${item.progress}%`}}/></div></div>{item.status==='uploading'?<Loader2 className="spin"/>:item.status==='done'?<CheckCircle2 className="success-color"/>:<button className="icon-button" onClick={()=>setFiles(v=>v.filter((_,j)=>j!==i))}><X/></button>}</div>)}</div>}<div className="form-actions"><button className="button button-ghost"><Plus size={15}/> Add external URL</button><button className="button button-primary" disabled={!files.length} onClick={upload}>Upload {files.length||''} file{files.length===1?'':'s'}</button></div>{message&&<p className="success-message">{message}</p>}</section><aside className="panel"><div className="eyebrow warm">COST-SAFE VIDEO FLOW</div><h2>Large files never pass through the Worker.</h2><p>ApproveFlow asks the API for signed R2 upload URLs, then the browser sends file parts directly to R2. Failed parts can be retried without restarting a multi-GB upload.</p><div className="upload-flow"><span>Browser</span><b>→</b><span>Signed URL</span><b>→</b><span>Private R2</span></div></aside></div></div></>;
-}
+export { UploadContent as default } from './TrialPages';

@@ -11,3 +11,7 @@ apps/web/dist
 coverage
 .DS_Store
 *.log
+
+.playwright-cli/
+output/
+*.tsbuildinfo

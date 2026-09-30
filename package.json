@@ -16,7 +16,8 @@
     "db:migrate:remote": "wrangler d1 migrations apply DB --remote --config wrangler.generated.json",
     "deploy:prepare": "node scripts/cloudflare/provision.mjs",
     "deploy": "node scripts/cloudflare/deploy.mjs",
-    "preview": "npm run preview -w apps/web"
+    "preview": "npm run preview -w apps/web",
+    "test:trial": "node scripts/trial/check.mjs"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260923.1",

@@ -61,6 +61,8 @@ test('bootstrap creates missing D1/R2, configures policies, and is idempotent', 
 
     const env = {
       CLOUDFLARE_API_TOKEN: 'test-token',
+      R2_ACCESS_KEY_ID: 'test-id',
+      R2_SECRET_ACCESS_KEY: 'test-secret',
       CLOUDFLARE_ACCOUNT_ID: 'a'.repeat(32),
     };
 

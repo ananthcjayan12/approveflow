@@ -1,5 +1,4 @@
 export const secretNames = [
-  'SESSION_SECRET',
   'RESEND_API_KEY',
   'R2_ACCESS_KEY_ID',
   'R2_SECRET_ACCESS_KEY',
@@ -39,8 +38,11 @@ export function validate(env) {
     }
   }
 
-  if (env.SESSION_SECRET && env.SESSION_SECRET.length < 32) {
-    throw new Error('SESSION_SECRET must be at least 32 characters.');
+  for (const key of ['R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY']) {
+    if (!env[key]) throw new Error(`Missing ${key}. Media uploads require R2 credentials in GitHub Actions secrets.`);
+  }
+  if (env.RESEND_API_KEY && (!env.EMAIL_FROM || env.EMAIL_FROM.includes('example.com'))) {
+    throw new Error('EMAIL_FROM must use your verified sender when RESEND_API_KEY is supplied.');
   }
 
   for (const key of positiveIntegerVars) {

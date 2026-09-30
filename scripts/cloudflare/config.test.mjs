@@ -51,11 +51,13 @@ test('managed policy update preserves unrelated rules', () => {
 test('deployment validation catches partial credentials and insecure origins', () => {
   const env = {
     CLOUDFLARE_API_TOKEN: 'token',
+    R2_ACCESS_KEY_ID: 'test-id',
+    R2_SECRET_ACCESS_KEY: 'test-secret',
     CLOUDFLARE_ACCOUNT_ID: 'a'.repeat(32),
   };
 
   assert.throws(
-    () => validate({ ...env, R2_ACCESS_KEY_ID: 'id-only' }),
+    () => validate({ ...env, R2_ACCESS_KEY_ID: 'id-only', R2_SECRET_ACCESS_KEY: '' }),
     /both/,
   );
   assert.throws(
@@ -67,4 +69,12 @@ test('deployment validation catches partial credentials and insecure origins', (
     /HTTPS/,
   );
   assert.equal(validate(env).name, 'approveflow');
+});
+
+test('functional deployment requires storage credentials and a configured email sender', () => {
+  const env = { CLOUDFLARE_API_TOKEN: 'token', CLOUDFLARE_ACCOUNT_ID: 'a'.repeat(32) };
+  assert.throws(() => validate(env), /Missing R2_ACCESS_KEY_ID/);
+  const storage = { ...env, R2_ACCESS_KEY_ID: 'id', R2_SECRET_ACCESS_KEY: 'secret' };
+  assert.throws(() => validate({ ...storage, RESEND_API_KEY: 'email-key' }), /EMAIL_FROM/);
+  assert.equal(validate({ ...storage, RESEND_API_KEY: 'email-key', EMAIL_FROM: 'Studio <review@studio.test>' }).name, 'approveflow');
 });

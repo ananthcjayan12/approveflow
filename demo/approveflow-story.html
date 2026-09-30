@@ -1,0 +1,1011 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ApproveFlow Story</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#1c1b18;--ink2:#272521;--cream:#f4eddf;--cream2:#fffaf1;--paper:#fffdf7;--line:#ded4c3;
+  --yellow:#ffc53d;--yellow2:#f4b92d;--orange:#ff5d40;--green:#1f9d66;--red:#d94d43;--muted:#746f66;
+  --s-bg:#dfe3ea;--s-desk:#c4ccd7;--s-ink:#3b4658;--s-card:#f7f8fa;--s-accent:#6b7a92;--s-line:#cfd5de;
+  --serif:Georgia,'Times New Roman',serif;
+  --sans:Inter,ui-sans-serif,system-ui,-apple-system,'Segoe UI',sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:#0e0e0d;overflow:hidden}
+#viewport{position:absolute;inset:0 0 64px 0;display:grid;place-items:center}
+body.render #viewport{inset:0}
+#frame{position:relative;width:1920px;height:1080px;transform-origin:0 0}
+#stage{position:absolute;inset:0;overflow:hidden;background:var(--cream);font-family:var(--sans);color:var(--ink)}
+.abs{position:absolute}
+.layer{position:absolute;inset:0}
+.pill{display:inline-flex;align-items:center;gap:10px;border-radius:999px;font-weight:700}
+.serif{font-family:var(--serif);letter-spacing:-.03em}
+
+/* controls */
+#controls{position:fixed;left:0;right:0;bottom:0;height:64px;display:flex;align-items:center;gap:16px;padding:0 20px;background:#161614;color:#eee;font:500 14px var(--sans)}
+body.render #controls{display:none}
+#controls button{background:var(--yellow);color:var(--ink);border:0;border-radius:10px;height:38px;min-width:44px;padding:0 14px;font-weight:700}
+#controls input{flex:1;accent-color:var(--yellow)}
+#time{font-variant-numeric:tabular-nums;min-width:110px;text-align:right;color:#bbb}
+
+/* captions & labels */
+.caption{position:absolute;left:50%;top:938px;transform:translateX(-50%);white-space:nowrap}
+.caption>div{background:var(--ink);color:var(--cream2);font:600 40px/1 var(--sans);letter-spacing:-.02em;padding:22px 34px;border-radius:18px;box-shadow:0 14px 40px rgba(0,0,0,.18)}
+.caption.struggle>div{background:var(--s-ink);color:#f3f5f8}
+.caption.night>div{background:rgba(255,255,255,.1);color:#f3f5f8;border:1px solid rgba(255,255,255,.18)}
+.tlabel{position:absolute;left:80px;top:40px;padding:12px 20px;font:800 20px/1 var(--sans);letter-spacing:.12em;text-transform:uppercase;border-radius:999px;background:var(--ink);color:var(--yellow)}
+.tlabel.struggle{background:var(--s-ink);color:#e7ebf1}
+.tlabel.night{background:rgba(255,255,255,.1);color:#cfd8e6}
+
+/* people */
+.person{position:absolute;overflow:visible}
+.person .head{transform-box:view-box;transform-origin:200px 300px}
+.person .body{transform-box:view-box;transform-origin:200px 480px}
+
+/* generic cards */
+.card{position:absolute;background:#fff;border-radius:22px;box-shadow:0 24px 60px rgba(30,40,60,.14);overflow:hidden}
+.s-card{background:var(--s-card);box-shadow:0 24px 60px rgba(40,55,80,.16)}
+.winbar{height:52px;display:flex;align-items:center;gap:9px;padding:0 20px;border-bottom:1px solid var(--s-line);font:600 18px var(--sans);color:var(--s-ink)}
+.winbar i{width:13px;height:13px;border-radius:50%;background:#c9d0da;display:block}
+.winbar span{margin-left:12px}
+
+/* struggle scene */
+.chip{display:flex;align-items:center;gap:10px;background:#fff;border:1px solid var(--s-line);border-radius:12px;padding:10px 12px;font:600 16px var(--sans);color:var(--s-ink)}
+.chip b{width:26px;height:32px;border-radius:5px;background:#b9c3d1;display:block;flex:none}
+.notif{position:absolute;background:#fff;border-radius:20px;box-shadow:0 20px 50px rgba(40,55,80,.2);padding:20px 24px;width:430px;font:500 22px/1.35 var(--sans);color:var(--s-ink)}
+.notif .from{display:flex;align-items:center;gap:10px;font:700 16px var(--sans);color:var(--s-accent);margin-bottom:8px;text-transform:uppercase;letter-spacing:.06em}
+.notif .from i{width:26px;height:26px;border-radius:8px;display:block}
+.notif .msg{font:600 26px/1.3 var(--sans);color:#243044}
+.qsticker{position:absolute;font:italic 700 50px/1 var(--serif);color:var(--red);background:#fff;padding:14px 24px;border-radius:14px;box-shadow:0 14px 34px rgba(0,0,0,.15);white-space:nowrap}
+.badge{position:absolute;background:var(--red);color:#fff;font:800 30px/1 var(--sans);border-radius:999px;padding:12px 20px;box-shadow:0 10px 24px rgba(217,77,67,.4)}
+.tile{position:absolute;top:90px;width:230px;text-align:center;font:600 19px/1.3 var(--sans);color:var(--s-ink)}
+.tile .thumb{width:200px;height:200px;margin:0 auto 14px;border-radius:14px;overflow:hidden;box-shadow:0 8px 20px rgba(40,55,80,.15)}
+.bubble-out{align-self:flex-end;background:var(--s-accent);color:#fff;font:600 26px/1.3 var(--sans);padding:18px 24px;border-radius:24px 24px 6px 24px;max-width:520px}
+.meta{align-self:flex-end;font:500 16px var(--sans);color:#8b96a8;margin:-6px 6px 8px}
+
+/* app window */
+.appwin{position:absolute;left:640px;top:110px;width:1200px;height:700px;background:var(--paper);border-radius:24px;box-shadow:0 30px 80px rgba(38,29,17,.16);overflow:hidden;border:1px solid var(--line)}
+.side{position:absolute;left:0;top:0;bottom:0;width:230px;background:var(--ink);color:#cfc7b8;padding:28px 22px}
+.side .nav{margin-top:36px;display:grid;gap:6px;font:600 17px var(--sans)}
+.side .nav div{padding:11px 14px;border-radius:10px}
+.side .nav .on{background:rgba(255,197,61,.14);color:var(--yellow)}
+.lockup{display:flex;align-items:center;gap:10px;font:800 22px/1 var(--sans);letter-spacing:-.04em;color:#fff}
+.lockup span{color:var(--yellow)}
+.mark{width:34px;height:34px;border-radius:9px;background:var(--yellow);display:grid;place-items:center;flex:none}
+.mark svg{width:60%;height:60%}
+.main{position:absolute;left:230px;top:0;right:0;bottom:0}
+.panel{position:absolute;inset:0;padding:40px 48px}
+.panel h3{font:400 38px/1.1 var(--serif);letter-spacing:-.03em;margin:0 0 6px}
+.crumb{font:600 16px var(--sans);color:var(--muted);margin-bottom:26px}
+.drop{height:150px;border:3px dashed var(--line);border-radius:18px;display:grid;place-items:center;font:600 20px var(--sans);color:var(--muted);background:var(--cream2)}
+.urow{display:flex;align-items:center;gap:16px;height:62px;border-bottom:1px solid #eee5d6;font:600 19px var(--sans)}
+.urow .ic{width:34px;height:40px;border-radius:7px;flex:none}
+.urow .nm{width:230px}
+.urow .sz{width:90px;color:var(--muted);font-weight:500;font-size:16px}
+.bar{position:relative;width:360px;height:12px;border-radius:99px;background:#efe6d6;overflow:hidden}
+.bar .fill{position:absolute;left:0;top:0;bottom:0;width:0;background:var(--yellow2);border-radius:99px}
+.segs{display:flex;gap:5px;width:360px}
+.segs .bar{width:auto;flex:1}
+.ok{width:30px;height:30px;border-radius:50%;background:var(--green);display:grid;place-items:center;flex:none}
+.ok svg{width:16px}
+.field{border:1.5px solid var(--line);border-radius:12px;background:#fff;padding:14px 16px;font:600 19px var(--sans);display:flex;justify-content:space-between;align-items:center}
+.flabel{font:700 14px var(--sans);color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin:0 0 8px}
+.toggle{width:62px;height:36px;border-radius:99px;background:#ddd3c2;position:relative;flex:none;transition:none}
+.toggle i{position:absolute;left:4px;top:4px;width:28px;height:28px;border-radius:50%;background:#fff;box-shadow:0 2px 6px rgba(0,0,0,.2)}
+.toggle.on{background:var(--green)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;border-radius:14px;font:700 20px var(--sans);padding:16px 26px}
+.btn.y{background:var(--yellow);color:var(--ink)}
+.btn.g{background:var(--green);color:#fff}
+.btn.o{background:#fff;color:var(--orange);border:2px solid var(--orange)}
+.tag{display:inline-block;padding:7px 13px;border-radius:99px;font:700 15px var(--sans)}
+.tag.y{background:#fff1c9;color:#8a5b00}
+.tag.g{background:#ddf3e8;color:var(--green)}
+.tag.o{background:#ffe4dd;color:#c7412a}
+.marker{position:absolute;width:44px;height:44px;margin:-22px 0 0 -22px;border-radius:50%;background:var(--yellow);border:3px solid var(--ink);display:grid;place-items:center;font:800 20px var(--sans);color:var(--ink);box-shadow:0 6px 14px rgba(0,0,0,.2)}
+.cbub{position:absolute;background:var(--ink);color:#fff;font:600 20px/1.2 var(--sans);padding:12px 16px;border-radius:14px;white-space:nowrap;min-width:40px;min-height:48px}
+
+/* phone */
+.phone{position:absolute;left:900px;top:36px;width:460px;height:880px;border-radius:64px;background:var(--ink);padding:18px;box-shadow:0 40px 90px rgba(38,29,17,.28)}
+.screen{position:relative;width:100%;height:100%;border-radius:48px;overflow:hidden;background:var(--cream2)}
+.finger{position:absolute;left:0;top:0;width:64px;height:64px;margin:-32px 0 0 -32px;border-radius:50%;background:rgba(28,27,24,.25);border:3px solid rgba(255,255,255,.95);box-shadow:0 6px 18px rgba(0,0,0,.25);z-index:50}
+.cursor{position:absolute;left:0;top:0;width:44px;height:44px;z-index:50}
+.ring{position:absolute;left:-26px;top:-26px;width:52px;height:52px;border-radius:50%;border:4px solid var(--yellow2);opacity:0}
+.steps{position:absolute;left:1420px;top:250px;display:grid;gap:22px}
+.step{display:flex;align-items:center;gap:16px;font:600 26px var(--sans);color:var(--muted)}
+.step .n{width:46px;height:46px;border-radius:50%;border:3px solid var(--line);display:grid;place-items:center;font:800 20px var(--sans);color:var(--muted);background:#fff;position:relative}
+.step .n .ok{position:absolute;inset:-3px;width:auto;height:auto}
+</style>
+</head>
+<body>
+<div id="viewport"><div id="frame"><div id="stage">
+
+<!-- ========== STRUGGLE LAYER (0–41.6) ========== -->
+<div class="layer" id="L-struggle" style="background:var(--s-bg)">
+  <div class="layer" id="shake">
+    <div class="abs" style="left:0;top:840px;width:1920px;height:240px;background:var(--s-desk);border-top:14px solid #b3bcc8"></div>
+    <div id="o1-wrap" class="abs" style="left:110px;top:390px;width:400px;height:480px"></div>
+    <div class="abs" style="left:190px;top:690px;width:270px;height:165px;background:#9aa5b4;border-radius:14px 14px 4px 4px"></div>
+    <div class="abs" style="left:160px;top:846px;width:330px;height:12px;background:#8a95a5;border-radius:6px"></div>
+    <div class="abs" id="mug1" style="left:520px;top:770px;width:64px;height:76px">
+      <div class="abs" style="left:52px;top:18px;width:30px;height:34px;border:8px solid #8a97aa;border-radius:0 16px 16px 0"></div>
+      <div class="abs" style="inset:0;background:#8a97aa;border-radius:6px 6px 14px 14px"></div>
+      <svg class="abs steam" id="steam1" style="left:6px;top:-70px" width="54" height="64" viewBox="0 0 54 64"><path d="M14 60c-8-10 8-16 0-28s6-18 0-28M36 60c-8-10 8-16 0-28s6-18 0-28" stroke="#aab4c3" stroke-width="5" fill="none" stroke-linecap="round"/></svg>
+    </div>
+
+    <!-- S1 email -->
+    <div class="card s-card" id="email" style="left:700px;top:150px;width:1080px;height:480px">
+      <div class="winbar"><i></i><i></i><i></i><span>New message</span></div>
+      <div style="padding:26px 34px;font:500 22px/1.5 var(--sans);color:var(--s-ink)">
+        <div style="border-bottom:1px solid var(--s-line);padding-bottom:12px"><b style="color:#8b96a8">To:</b> client@smilecraft.example</div>
+        <div style="border-bottom:1px solid var(--s-line);padding:12px 0"><b style="color:#8b96a8">Subject:</b> October content — FINAL ✨</div>
+        <div style="padding:16px 0 18px">Hi! Attached are all 14 files for October. Let me know your thoughts :)</div>
+        <div id="attach" style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px"></div>
+      </div>
+      <div class="btn abs" id="sendbtn" style="right:34px;bottom:28px;background:var(--s-accent);color:#fff">Send</div>
+    </div>
+    <div class="abs pill" id="sent" style="left:1540px;top:130px;background:#fff;padding:14px 22px;font-size:22px;color:var(--s-ink);box-shadow:0 12px 30px rgba(40,55,80,.18)">✓ Sent · 14 attachments</div>
+
+    <!-- S2 notifications -->
+    <div class="notif" id="n1" style="left:690px;top:140px"><div class="from"><i style="background:#25d366"></i>WhatsApp · Client</div><div class="msg">Can the number be bigger?</div></div>
+    <div class="notif" id="n2" style="left:1300px;top:200px"><div class="from"><i style="background:#6b8bd6"></i>Mail · reception@</div><div style="font-size:17px;color:#8b96a8">RE: RE: FW: October content</div><div class="msg">Love it!! 😍</div></div>
+    <div class="notif" id="n3" style="left:760px;top:390px;width:360px;padding:14px">
+      <div style="height:200px;border-radius:12px;background:linear-gradient(135deg,#b7c0cc,#8e99a9);filter:blur(0);position:relative;overflow:hidden">
+        <div class="abs" style="left:40px;top:40px;width:180px;height:120px;background:#dfe5ec;border-radius:10px;filter:blur(7px)"></div>
+        <div class="abs" style="left:200px;top:100px;font-size:64px;filter:blur(1px)">👆</div>
+      </div>
+      <div class="msg" style="padding:10px 6px 2px;font-size:22px">see this</div>
+    </div>
+    <div class="notif" id="n4" style="left:1250px;top:470px;width:520px">
+      <div class="from"><i style="background:#25d366"></i>Voice note · 0:47</div>
+      <div style="display:flex;align-items:center;gap:14px">
+        <div style="width:48px;height:48px;border-radius:50%;background:var(--s-accent);display:grid;place-items:center;flex:none"><svg width="18" height="20" viewBox="0 0 18 20"><path d="M2 1l15 9-15 9z" fill="#fff"/></svg></div>
+        <div id="wave" style="display:flex;align-items:center;gap:4px;height:48px"></div>
+      </div>
+      <div style="font:italic 500 21px var(--sans);color:#5b6b82;margin-top:8px">“…around the middle of the video…”</div>
+    </div>
+    <div class="notif" id="n5" style="left:720px;top:640px;width:460px"><div class="from"><i style="background:#6b8bd6"></i>Mail · Client</div><div class="msg">Use the new logo</div><div style="font-size:17px;color:#b0402f;font-weight:700;margin-top:6px">📎 0 attachments</div></div>
+    <div class="badge" id="badge" style="left:1760px;top:110px">1</div>
+    <div class="qsticker" id="q1" style="left:1150px;top:120px;transform:rotate(-4deg)">Which post?</div>
+    <div class="qsticker" id="q2" style="left:1260px;top:720px">Which number?</div>
+    <div class="qsticker" id="q3" style="left:1080px;top:380px;font-size:84px;padding:22px 36px">Which version?!</div>
+
+    <!-- S3 files -->
+    <div class="card s-card" id="finder" style="left:700px;top:150px;width:1080px;height:470px">
+      <div class="winbar"><i></i><i></i><i></i><span>October ▸ Final ▸ Final (2)</span></div>
+      <div class="tile" id="tile0" style="left:40px"><div class="thumb"></div>post1_final.jpg</div>
+      <div class="tile" id="tile1" style="left:295px"><div class="thumb"></div>post1_final_v2.jpg</div>
+      <div class="tile" id="tile2" style="left:550px"><div class="thumb"></div>post1_FINAL_approved.jpg</div>
+      <div class="tile" id="tile3" style="left:805px"><div class="thumb"></div>post1_final_v2_USE_THIS.jpg</div>
+      <div class="abs serif" id="bigq" style="left:470px;top:120px;font-size:300px;color:var(--red);opacity:.9;font-style:italic">?</div>
+    </div>
+
+    <!-- S4 chase -->
+    <div class="card s-card" id="cal" style="left:700px;top:150px;width:380px;height:520px">
+      <div style="height:80px;background:#b0402f;color:#fff;font:800 26px/80px var(--sans);text-align:center;letter-spacing:.2em">OCTOBER</div>
+      <div id="days" style="position:relative;height:300px">
+        <div class="abs day" style="inset:0;text-align:center;padding-top:30px"><div style="font:800 34px var(--sans);color:#8b96a8;letter-spacing:.12em">TUESDAY</div><div class="serif" style="font-size:170px;line-height:1;color:var(--s-ink)">14</div></div>
+        <div class="abs day" style="inset:0;text-align:center;padding-top:30px"><div style="font:800 34px var(--sans);color:#8b96a8;letter-spacing:.12em">WEDNESDAY</div><div class="serif" style="font-size:170px;line-height:1;color:var(--s-ink)">15</div></div>
+        <div class="abs day" style="inset:0;text-align:center;padding-top:30px"><div style="font:800 34px var(--sans);color:#8b96a8;letter-spacing:.12em">THURSDAY</div><div class="serif" style="font-size:170px;line-height:1;color:var(--s-ink)">16</div></div>
+      </div>
+      <div style="text-align:center"><span class="pill" id="launch" style="padding:14px 24px;font-size:24px;background:#eef1f5;color:var(--s-ink)">🚀 Launch: Mon 20</span></div>
+    </div>
+    <div class="card s-card" id="chat" style="left:1130px;top:150px;width:680px;height:620px">
+      <div class="winbar"><i></i><i></i><i></i><span>Client</span></div>
+      <div style="display:flex;flex-direction:column;gap:14px;padding:30px">
+        <div class="bubble-out" id="m1">Just checking in! 🙂</div><div class="meta" id="mm1">Tue 10:14 · Delivered</div>
+        <div class="bubble-out" id="m2">Gentle reminder 🙂</div><div class="meta" id="mm2">Wed 16:02 · Delivered</div>
+        <div class="bubble-out" id="m3">Hi again! Any thoughts on October?</div><div class="meta" id="mm3">Thu 11:30 · Delivered</div>
+        <div id="typing" style="align-self:flex-start;background:#e6eaf0;border-radius:24px;padding:18px 22px;display:flex;gap:8px"><i style="width:12px;height:12px;border-radius:50%;background:#98a3b3;display:block"></i><i style="width:12px;height:12px;border-radius:50%;background:#98a3b3;display:block"></i><i style="width:12px;height:12px;border-radius:50%;background:#98a3b3;display:block"></i></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- S5 night -->
+  <div class="layer" id="night" style="background:rgba(12,16,28,.86)"></div>
+  <div class="abs" id="glow" style="left:60px;top:380px;width:560px;height:560px;border-radius:50%;background:radial-gradient(circle,rgba(150,180,255,.32),rgba(150,180,255,0) 65%)"></div>
+  <div class="abs" id="unread" style="left:1180px;top:330px;text-align:center;color:#aeb9cc">
+    <div style="position:relative;width:220px;height:160px;margin:0 auto">
+      <div class="abs" style="left:10px;top:40px;width:200px;height:120px;border-radius:14px;background:#2a3346;transform:rotate(-6deg)"></div>
+      <div class="abs" style="left:10px;top:30px;width:200px;height:120px;border-radius:14px;background:#343f56;transform:rotate(4deg)"></div>
+      <div class="abs" style="left:10px;top:20px;width:200px;height:120px;border-radius:14px;background:#3f4b66"><svg viewBox="0 0 200 120" width="200" height="120"><path d="M10 12l90 60 90-60" stroke="#6d7a96" stroke-width="6" fill="none"/></svg></div>
+      <div class="badge" style="right:-26px;top:-4px;left:auto">37</div>
+    </div>
+    <div style="font:600 30px var(--sans);margin-top:26px">unread messages</div>
+  </div>
+
+  <!-- S6 the mark -->
+  <div class="abs" id="flood" style="left:1255px;top:405px;width:90px;height:90px;border-radius:22px;background:var(--yellow);box-shadow:0 0 60px 20px rgba(255,197,61,.45);display:grid;place-items:center">
+    <svg id="floodcheck" viewBox="0 0 24 24" width="50" height="50"><path d="M5 12.5l4.5 4.5L19 7.5" stroke="#1c1b18" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </div>
+</div>
+
+<!-- ========== INTRO CARD (41.2–44.4) ========== -->
+<div class="layer" id="L-intro" style="background:var(--cream);display:grid;place-items:center">
+  <div style="text-align:center">
+    <div id="intro-lock" class="lockup" style="justify-content:center;font-size:104px;color:var(--ink);gap:28px">
+      <div class="mark" style="width:120px;height:120px;border-radius:30px"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" stroke="#1c1b18" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <div>Approve<span style="color:var(--yellow2)">Flow</span></div>
+    </div>
+    <div id="intro-line" class="serif" style="font-size:78px;margin-top:48px">Client approval without the chaos.</div>
+  </div>
+</div>
+
+<!-- ========== RELIEF LAYER ========== -->
+<div class="layer" id="L-relief" style="background:var(--cream)">
+  <div class="abs" style="left:90px;top:120px;width:380px;height:250px;border:14px solid #fffaf1;border-radius:18px;background:linear-gradient(180deg,#ffe9a8,#fff4d6);box-shadow:0 10px 30px rgba(38,29,17,.08);overflow:hidden">
+    <div class="abs" id="sun" style="left:220px;top:40px;width:96px;height:96px;border-radius:50%;background:var(--yellow);box-shadow:0 0 0 18px rgba(255,197,61,.25)"></div>
+    <div class="abs" style="left:-20px;top:150px;width:220px;height:120px;border-radius:50%;background:#f8e1b0"></div>
+    <div class="abs" style="left:140px;top:170px;width:260px;height:120px;border-radius:50%;background:#f3d79c"></div>
+  </div>
+  <div class="abs" style="left:0;top:840px;width:1920px;height:240px;background:#e8dcc6;border-top:14px solid #dccdb2"></div>
+  <div id="o2-wrap" class="abs" style="left:110px;top:390px;width:400px;height:480px"></div>
+  <div class="abs" id="lid" style="left:190px;top:690px;width:270px;height:165px;background:var(--ink);border-radius:14px 14px 4px 4px;display:grid;place-items:center;transform-origin:50% 100%">
+    <div class="mark" style="width:40px;height:40px"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" stroke="#1c1b18" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+  </div>
+  <div class="abs" style="left:160px;top:846px;width:330px;height:12px;background:#2d2b27;border-radius:6px"></div>
+  <div class="abs" style="left:520px;top:770px;width:64px;height:76px">
+    <div class="abs" style="left:52px;top:18px;width:30px;height:34px;border:8px solid var(--yellow2);border-radius:0 16px 16px 0"></div>
+    <div class="abs" style="inset:0;background:var(--yellow);border-radius:6px 6px 14px 14px"></div>
+    <svg class="abs" id="steam2" style="left:6px;top:-70px" width="54" height="64" viewBox="0 0 54 64"><path d="M14 60c-8-10 8-16 0-28s6-18 0-28M36 60c-8-10 8-16 0-28s6-18 0-28" stroke="#d6c5a6" stroke-width="5" fill="none" stroke-linecap="round"/></svg>
+  </div>
+  <div class="abs" style="left:40px;top:748px;width:70px;height:100px">
+    <div class="abs" style="left:10px;top:44px;width:52px;height:56px;background:#d9674a;border-radius:6px 6px 14px 14px"></div>
+    <div class="abs" style="left:4px;top:0;width:30px;height:52px;background:#3f8f5f;border-radius:30px 0 30px 0;transform:rotate(-20deg)"></div>
+    <div class="abs" style="left:32px;top:4px;width:30px;height:48px;background:#53a874;border-radius:0 30px 0 30px;transform:rotate(18deg)"></div>
+  </div>
+
+  <!-- app window -->
+  <div class="appwin" id="appwin">
+    <div class="side">
+      <div class="lockup"><div class="mark"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" stroke="#1c1b18" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>Approve<span>Flow</span></div>
+      <div class="nav"><div class="nv" data-p="dash">Dashboard</div><div>Clients</div><div class="nv" data-p="proj">Projects</div><div>Activity</div><div>Storage</div><div>Settings</div></div>
+    </div>
+    <div class="main">
+      <!-- upload -->
+      <div class="panel" id="p-upload">
+        <h3>Upload content</h3><div class="crumb">SmileCraft Dental / November Content</div>
+        <div class="drop" id="drop">Drop images, PDFs or video here</div>
+        <div id="urows" style="margin-top:14px"></div>
+      </div>
+      <!-- send -->
+      <div class="panel" id="p-send">
+        <h3>Send for approval</h3><div class="crumb">Choose what the client should review</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:22px">
+          <div><div class="flabel">Client</div><div class="field">SmileCraft Dental <span style="color:var(--muted)">▾</span></div></div>
+          <div><div class="flabel">Project</div><div class="field">November Content <span style="color:var(--muted)">▾</span></div></div>
+        </div>
+        <div class="flabel" style="margin-top:24px">Assets</div>
+        <div id="sthumbs" style="display:flex;gap:16px"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:22px;margin-top:24px;align-items:end">
+          <div><div class="flabel">Reviewer</div><div class="field">client@smilecraft.example</div></div>
+          <div style="display:flex;align-items:center;gap:14px;padding-bottom:8px">
+            <div class="toggle" id="tog"><i id="knob"></i></div>
+            <div style="font:700 19px var(--sans)">Automatic reminders</div>
+            <span class="tag y" id="rem1">24h</span><span class="tag y" id="rem2">72h</span>
+          </div>
+        </div>
+        <div class="btn y abs" id="sendreq" style="right:48px;bottom:40px">Send approval request →</div>
+      </div>
+      <!-- link -->
+      <div class="panel" id="p-link" style="display:grid;place-items:center">
+        <div style="text-align:center;width:720px">
+          <div style="width:96px;height:96px;border-radius:50%;background:var(--green);display:grid;place-items:center;margin:0 auto 24px"><svg width="50" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" stroke="#fff" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <h3>Ready for client review</h3>
+          <div class="crumb">One secure link. No account or password needed.</div>
+          <div style="display:flex;gap:12px;align-items:center">
+            <div class="field" id="linkfield" style="flex:1;justify-content:flex-start;gap:12px;font-size:21px">🔒 <span>…/review/k7Qx9mR2vT</span></div>
+            <div class="btn y" id="copybtn" style="position:relative"><span id="copy1">Copy</span><span id="copy2" class="abs" style="inset:0;display:grid;place-items:center">Copied ✓</span></div>
+          </div>
+          <div style="margin-top:18px;font:600 18px var(--sans);color:var(--green)">✓ Emailed to client@smilecraft.example</div>
+        </div>
+      </div>
+      <!-- review -->
+      <div class="panel" id="p-review">
+        <h3>SmileCraft · Post 1</h3><div class="crumb">November Content</div>
+        <div class="abs" style="left:48px;top:150px;width:470px;height:500px">
+          <div class="abs" id="v1" style="left:0;top:0;width:460px"><div class="post" data-v="1" style="width:460px;height:460px;border-radius:16px;overflow:hidden;position:relative"></div><span class="tag o abs" style="right:14px;top:14px">V1 · changes requested</span></div>
+          <div class="abs" id="v2" style="left:0;top:0;width:460px"><div class="post" data-v="2" style="width:460px;height:460px;border-radius:16px;overflow:hidden;box-shadow:0 20px 50px rgba(0,0,0,.18)"></div><span class="tag g abs" style="right:14px;top:14px">V2 · current</span></div>
+        </div>
+        <div class="abs" style="left:560px;top:150px;width:360px">
+          <div class="flabel">Client feedback · 4 notes</div>
+          <div id="clist" style="display:grid;gap:12px"></div>
+        </div>
+      </div>
+      <!-- dashboard -->
+      <div class="panel" id="p-dash">
+        <h3>Dashboard</h3><div class="crumb">Friday · everything on track</div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-bottom:26px">
+          <div class="field" style="display:block"><div class="flabel">Approved this week</div><div class="serif" id="kpi1" style="font-size:52px">0</div></div>
+          <div class="field" style="display:block"><div class="flabel">Waiting on client</div><div class="serif" id="kpi2" style="font-size:52px">4</div></div>
+          <div class="field" style="display:block"><div class="flabel">Reminders sent for you</div><div class="serif" id="kpi3" style="font-size:52px">0</div></div>
+        </div>
+        <div id="drows"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- S10 reminder -->
+  <div class="card" id="clock" style="left:720px;top:170px;width:400px;height:520px;display:grid;place-items:center;text-align:center">
+    <div>
+      <div style="position:relative;width:280px;height:280px;border-radius:50%;border:14px solid var(--ink);margin:0 auto;background:var(--cream2)">
+        <div class="abs" id="hhand" style="left:127px;top:60px;width:12px;height:80px;background:var(--ink);border-radius:6px;transform-origin:50% 100%"></div>
+        <div class="abs" id="mhand" style="left:129px;top:26px;width:8px;height:114px;background:var(--yellow2);border-radius:6px;transform-origin:50% 100%"></div>
+        <div class="abs" style="left:117px;top:117px;width:24px;height:24px;border-radius:50%;background:var(--ink)"></div>
+      </div>
+      <div class="serif" id="plus24" style="font-size:64px;margin-top:26px">+24 hours</div>
+    </div>
+  </div>
+  <div class="card" id="inbox" style="left:1180px;top:200px;width:660px;height:460px">
+    <div style="padding:26px 30px;border-bottom:1px solid #eee5d6;font:700 22px var(--sans);display:flex;justify-content:space-between">Client inbox <span style="color:var(--muted);font-weight:600">Tuesday</span></div>
+    <div id="remrow" style="padding:24px 30px;background:#fff8e3;border-bottom:1px solid #eee5d6;display:flex;gap:16px;align-items:flex-start">
+      <div class="mark" style="width:48px;height:48px;border-radius:12px"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" stroke="#1c1b18" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <div><div style="font:800 21px var(--sans)">Reminder: November Content is waiting</div><div style="font:500 18px/1.4 var(--sans);color:var(--muted);margin-top:4px">4 items are ready for your review. It takes about a minute.</div><span class="tag y" style="margin-top:12px">Sent automatically</span></div>
+    </div>
+    <div style="padding:22px 30px;border-bottom:1px solid #eee5d6;opacity:.45;font:600 19px var(--sans)">Clinic supplies · Invoice #4411</div>
+    <div style="padding:22px 30px;opacity:.45;font:600 19px var(--sans)">Staff rota · Next week</div>
+  </div>
+  <div class="abs pill" id="nochase" style="left:1180px;top:690px;padding:16px 24px;background:var(--ink);color:var(--yellow);font-size:22px">You didn't lift a finger.</div>
+
+  <!-- S11 approve + activity -->
+  <div class="card" id="apcard" style="left:680px;top:110px;width:540px;height:720px">
+    <div style="padding:22px 28px;font:700 20px var(--sans);display:flex;justify-content:space-between;border-bottom:1px solid #eee5d6">November Content <span class="tag g">V2</span></div>
+    <div class="post" data-v="2" style="position:absolute;left:40px;top:90px;width:460px;height:460px;border-radius:16px;overflow:hidden"></div>
+    <div id="stamp" class="abs" style="left:92px;top:250px;padding:14px 24px;border:7px solid var(--green);color:var(--green);border-radius:18px;font:900 48px/1 var(--sans);white-space:nowrap;letter-spacing:.06em;transform:rotate(-12deg);background:rgba(255,255,255,.88)">APPROVED ✓</div>
+    <div class="abs" style="left:40px;right:40px;bottom:36px;display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div class="btn o" style="font-size:18px;padding:16px 10px;white-space:nowrap">Request changes</div><div class="btn g" id="apbtn">Approve</div>
+    </div>
+    <div class="abs" id="modal" style="inset:0;background:rgba(28,27,24,.45);display:grid;place-items:center">
+      <div style="background:#fff;border-radius:20px;padding:30px;width:440px;box-shadow:0 20px 50px rgba(0,0,0,.25)">
+        <div style="font:800 26px var(--sans);margin-bottom:10px">Approve this version?</div>
+        <div style="font:500 19px/1.45 var(--sans);color:var(--muted);margin-bottom:22px">This records approval for the current version of the creative and caption.</div>
+        <div class="btn g" id="confirm" style="width:100%">Confirm approval</div>
+      </div>
+    </div>
+  </div>
+  <div class="card" id="activity" style="left:1270px;top:150px;width:570px;height:620px;padding:30px">
+    <div style="font:400 36px var(--serif);margin-bottom:22px">Activity</div>
+    <div id="alist" style="display:grid;gap:14px"></div>
+  </div>
+  <div class="abs pill" id="clock530" style="left:1560px;top:40px;padding:12px 22px;background:#fff;font-size:26px;box-shadow:0 10px 26px rgba(38,29,17,.12)">🕠 5:30 PM</div>
+</div>
+
+<!-- ========== CLIENT LAYER (54–70.4) ========== -->
+<div class="layer" id="L-client" style="background:#eef6f3">
+  <div class="abs" style="left:110px;top:130px;width:360px;height:200px;border-radius:24px;background:#fff;box-shadow:0 10px 30px rgba(20,60,50,.08);display:grid;place-items:center;text-align:center">
+    <div><svg width="70" height="70" viewBox="0 0 400 400"><path d="M160 110C175 100 190 108 200 112C210 108 225 100 240 110C262 124 258 160 248 185C240 205 238 230 230 250C224 264 212 262 210 246C207 228 204 214 200 214C196 214 193 228 190 246C188 262 176 264 170 250C162 230 160 205 152 185C142 160 138 124 160 110Z" transform="translate(-100 -80) scale(1.5)" fill="#fff" stroke="#2a9d8f" stroke-width="10"/></svg>
+    <div style="font:800 30px var(--sans);color:#1f6f66;margin-top:6px">SmileCraft Dental</div></div>
+  </div>
+  <div class="abs" style="left:0;top:840px;width:1920px;height:240px;background:#d3e8e1;border-top:14px solid #c2ddd4"></div>
+  <div id="c1-wrap" class="abs" style="left:110px;top:390px;width:400px;height:480px"></div>
+  <div class="abs pill" id="ninety" style="left:470px;top:420px;padding:16px 24px;background:var(--ink);color:var(--yellow);font-size:26px">⏱ Done in 90 seconds</div>
+
+  <div class="phone" id="phone"><div class="screen" id="pscreen">
+    <!-- lock screen -->
+    <div class="abs" id="lock" style="inset:0;background:linear-gradient(160deg,#2a9d8f,#1f6f66);color:#fff;text-align:center;padding-top:90px">
+      <div style="font:300 96px/1 var(--sans)">10:41</div><div style="font:500 22px var(--sans);opacity:.85;margin-top:8px">Tuesday</div>
+      <div id="lnotif" style="margin:60px 20px 0;background:rgba(255,255,255,.92);color:var(--ink);border-radius:24px;padding:18px 20px;text-align:left;display:flex;gap:14px">
+        <div class="mark" style="width:44px;height:44px;border-radius:11px"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" stroke="#1c1b18" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <div><div style="font:800 17px var(--sans)">Review request</div><div style="font:500 17px/1.35 var(--sans);color:#555">November Content is ready for you. Tap to review.</div></div>
+      </div>
+    </div>
+    <!-- review app -->
+    <div class="abs" id="rapp" style="inset:0;background:var(--cream2)">
+      <div style="padding:52px 24px 12px;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--line)">
+        <div class="mark"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" stroke="#1c1b18" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <div><div style="font:800 19px var(--sans)">November Content</div><div style="font:500 15px var(--sans);color:var(--muted)">SmileCraft Dental · Reviewing as client</div></div>
+      </div>
+      <div class="abs pill" id="nologin" style="left:24px;top:136px;background:#ddf3e8;color:var(--green);padding:8px 14px;font-size:16px;z-index:5">✓ No login needed</div>
+      <!-- asset viewport -->
+      <div class="abs" id="aview" style="left:12px;top:180px;width:400px;height:400px;border-radius:16px;overflow:hidden">
+        <div class="abs" id="strip" style="left:0;top:0;width:1200px;height:400px;display:flex">
+          <div class="post" data-v="1" style="width:400px;height:400px;flex:none"></div>
+          <div class="post" data-v="slide2" style="width:400px;height:400px;flex:none"></div>
+          <div class="post" data-v="slide3" style="width:400px;height:400px;flex:none"></div>
+        </div>
+        <div class="abs" id="video" style="inset:0;background:linear-gradient(160deg,#1f3b37,#11211f)">
+          <svg class="abs" style="left:100px;top:70px" width="200" height="200" viewBox="0 0 200 200"><circle cx="100" cy="100" r="80" fill="#f2c9a8"/><path d="M60 110 Q100 150 140 110" stroke="#1c1b18" stroke-width="8" fill="#fff"/><circle cx="72" cy="84" r="8" fill="#1c1b18"/><circle cx="128" cy="84" r="8" fill="#1c1b18"/></svg>
+          <div class="abs" style="left:20px;bottom:18px;color:#fff;font:700 18px var(--sans)">Smile Reel · 0:15</div>
+        </div>
+        <div class="abs" id="rbox" style="left:14px;top:14px;width:0;height:0;border:4px solid var(--yellow);border-radius:8px;background:rgba(255,197,61,.12)"></div>
+      </div>
+      <div class="abs" id="dots" style="left:0;right:0;top:590px;display:flex;justify-content:center;gap:8px"></div>
+      <!-- video timeline -->
+      <div class="abs" id="vtl" style="left:24px;right:24px;top:596px;height:40px">
+        <div class="abs" style="left:0;right:0;top:16px;height:8px;border-radius:4px;background:#e4d9c6"></div>
+        <div class="abs" id="vrange" style="left:106px;top:10px;width:0;height:20px;border-radius:6px;background:var(--yellow);border:3px solid var(--ink)"></div>
+        <div class="abs" id="vhead" style="left:0;top:4px;width:6px;height:32px;margin-left:-3px;border-radius:3px;background:var(--ink)"></div>
+        <div class="abs" id="vlabel" style="left:106px;top:40px;font:800 16px var(--sans)">0:04 – 0:09</div>
+      </div>
+      <!-- tools -->
+      <div class="abs" style="left:24px;right:24px;top:664px;display:flex;gap:8px" id="tools">
+        <div class="tool pill" data-t="pin" style="padding:10px 14px;font-size:16px;border:2px solid var(--line);background:#fff">📍 Pin</div>
+        <div class="tool pill" data-t="box" style="padding:10px 14px;font-size:16px;border:2px solid var(--line);background:#fff">▭ Box</div>
+        <div class="tool pill" data-t="draw" style="padding:10px 14px;font-size:16px;border:2px solid var(--line);background:#fff">✎ Draw</div>
+        <div class="tool pill" data-t="range" style="padding:10px 14px;font-size:16px;border:2px solid var(--line);background:#fff">⏱ Portion</div>
+      </div>
+      <div class="abs" style="left:18px;right:18px;bottom:30px;display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="btn g" style="font-size:17px;padding:16px 8px">Approve</div>
+        <div class="btn o" id="reqbtn" style="font-size:17px;padding:16px 8px">Request changes</div>
+      </div>
+      <div class="abs" id="sentbar" style="left:18px;right:18px;top:60px;background:var(--ink);color:#fff;border-radius:18px;padding:18px;font:700 18px var(--sans);text-align:center;z-index:9">✓ Feedback sent · 4 notes</div>
+    </div>
+    <div class="marker" id="pm1">1</div><div class="marker" id="pm2">2</div><div class="marker" id="pm3">3</div><div class="marker" id="pm4">4</div>
+    <div class="cbub" id="pb1"></div><div class="cbub" id="pb2"></div><div class="cbub" id="pb3"></div><div class="cbub" id="pb4"></div>
+    <div class="abs" id="bundle" style="left:150px;top:330px;width:120px;height:80px;border-radius:18px;background:var(--yellow);border:3px solid var(--ink);display:grid;place-items:center;font:800 22px var(--sans);z-index:8">✉ 4</div>
+  </div></div>
+  <div class="steps" id="steps">
+    <div class="step"><div class="n">1<div class="ok"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" stroke="#fff" stroke-width="3.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>Pin a spot</div>
+    <div class="step"><div class="n">2<div class="ok"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" stroke="#fff" stroke-width="3.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>Draw a box</div>
+    <div class="step"><div class="n">3<div class="ok"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" stroke="#fff" stroke-width="3.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>Comment on a slide</div>
+    <div class="step"><div class="n">4<div class="ok"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" stroke="#fff" stroke-width="3.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>Mark a moment in video</div>
+  </div>
+</div>
+
+<!-- ========== END CARD ========== -->
+<div class="layer" id="L-end" style="background:var(--cream);display:grid;place-items:center">
+  <div style="text-align:center">
+    <div id="end-lock" class="lockup" style="justify-content:center;font-size:96px;color:var(--ink);gap:26px">
+      <div class="mark" style="width:112px;height:112px;border-radius:28px"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" stroke="#1c1b18" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <div>Approve<span style="color:var(--yellow2)">Flow</span></div>
+    </div>
+    <div id="end-line" class="serif" style="font-size:64px;margin-top:36px">Get to “approved” without the chaos.</div>
+    <div id="hiw" style="display:flex;gap:18px;justify-content:center;align-items:center;margin-top:64px"></div>
+    <div id="cta" class="btn y" style="margin-top:60px;font-size:30px;padding:24px 44px;border-radius:18px">Get started free →</div>
+    <div id="cta-url" style="margin-top:22px;font:600 26px var(--sans);color:var(--muted)"></div>
+  </div>
+</div>
+
+<!-- pointers -->
+<svg class="cursor" id="cur" viewBox="0 0 44 44"><path d="M8 4l26 18-12 2-6 12z" fill="#1c1b18" stroke="#fff" stroke-width="3" stroke-linejoin="round"/></svg>
+<div class="abs" id="curring" style="left:0;top:0;z-index:49"><div class="ring" style="opacity:1"></div></div>
+<div class="finger" id="fing"></div>
+<div class="layer" id="captions" style="pointer-events:none"></div>
+
+</div></div></div>
+
+<div id="controls">
+  <button id="play">❚❚</button><button id="restart">↺</button>
+  <input id="scrub" type="range" min="0" max="100" step="0.01" value="0">
+  <div id="time">0:00 / 1:40</div>
+</div>
+
+<script>
+/* ---------- config ---------- */
+const DUR = 100;
+const CTA_URL = ''; // e.g. 'approveflow.app' — left blank until the real URL is confirmed
+
+/* ---------- tiny deterministic timeline engine ---------- */
+const E = {
+  out: p => 1 - Math.pow(1 - p, 3),
+  in: p => p * p * p,
+  inOut: p => p < .5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2,
+  back: p => { const c = 1.70158, c3 = c + 1; return 1 + c3 * Math.pow(p - 1, 3) + c * Math.pow(p - 1, 2); },
+  lin: p => p,
+};
+const tracks = new Map();
+const fxs = [];
+const Q = (s, ctx = document) => {
+  const r = typeof s === 'string' ? [...ctx.querySelectorAll(s)] : (Array.isArray(s) ? s.flatMap(x => Q(x, ctx)) : (s instanceof NodeList ? [...s] : [s]));
+  if (!r.length || r.some(e => !e)) console.warn('missing', s);
+  return r.filter(Boolean);
+};
+function tw(sel, t0, dur, props, ease = 'out') {
+  for (const el of Q(sel)) {
+    if (!tracks.has(el)) tracks.set(el, {});
+    const tr = tracks.get(el);
+    for (const k in props) {
+      const [a, b] = props[k];
+      (tr[k] ||= []).push({ t0, t1: t0 + dur, a, b, e: E[ease] || ease });
+    }
+  }
+}
+const at = (sel, t, props) => tw(sel, t, 0, props);
+function fx(t0, dur, fn) { fxs.push({ t0, dur, fn }); }
+function cls(sel, t, name) { const els = Q(sel); fx(t, 0, (p) => els.forEach(el => el.classList.toggle(name, p >= 1))); }
+function vis(sel, ranges) { const els = Q(sel); fx(0, 0, (p, t) => { const on = ranges.some(([a, b]) => t >= a && t < b); els.forEach(el => el.style.visibility = on ? 'visible' : 'hidden'); }); }
+function type(sel, t0, dur, text) { const els = Q(sel); fx(t0, dur, p => els.forEach(el => el.textContent = text.slice(0, Math.round(text.length * p)))); }
+function count(sel, t0, dur, a, b) { const els = Q(sel); fx(t0, dur, p => els.forEach(el => el.textContent = Math.round(a + (b - a) * E.out(p)))); }
+function valAt(segs, t) {
+  let v = segs[0].a;
+  for (const s of segs) {
+    if (t >= s.t1) v = s.b;
+    else if (t >= s.t0) { v = s.a + (s.b - s.a) * s.e((t - s.t0) / (s.t1 - s.t0)); break; }
+    else break;
+  }
+  return v;
+}
+function render(t) {
+  for (const [el, tr] of tracks) {
+    const g = k => tr[k] ? valAt(tr[k], t) : undefined;
+    const x = g('x'), y = g('y'), s = g('s'), r = g('r'), sx = g('sx'), sy = g('sy');
+    if ([x, y, s, r, sx, sy].some(v => v !== undefined)) {
+      el.style.transform = `${el._baseT || ''} translate(${x || 0}px,${y || 0}px) rotate(${r || 0}deg) scale(${s ?? 1}) scale(${sx ?? 1},${sy ?? 1})`;
+    }
+    if (tr.o) el.style.opacity = g('o');
+    if (tr.wp) el.style.width = g('wp') + '%';
+    if (tr.w) el.style.width = g('w') + 'px';
+    if (tr.h) el.style.height = g('h') + 'px';
+    if (tr.l) el.style.left = g('l') + 'px';
+    if (tr.blur) el.style.filter = `blur(${g('blur')}px)`;
+  }
+  for (const f of fxs) {
+    const p = f.dur <= 0 ? (t >= f.t0 ? 1 : 0) : Math.min(1, Math.max(0, (t - f.t0) / f.dur));
+    f.fn(p, t);
+  }
+}
+function sortTracks() { for (const tr of tracks.values()) for (const k in tr) tr[k].sort((a, b) => a.t0 - b.t0); }
+
+/* ---------- builders ---------- */
+const CHECK = c => `<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" stroke="${c}" stroke-width="3.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+function personSVG(id, { skin, hair, top, coat, long }) {
+  const ink = '#1c1b18', sw = 'stroke-width="6" stroke-linecap="round" fill="none"';
+  return `<svg id="${id}" class="person" viewBox="0 0 400 480" width="400" height="480">
+  <g class="body">
+    ${long ? `<path d="M112 220C98 330 128 350 164 346L236 346C272 350 302 330 288 220Z" fill="${hair}"/>` : ''}
+    <path d="M50 480C50 372 112 330 200 330C288 330 350 372 350 480Z" fill="${coat ? '#ffffff' : top}" ${coat ? 'stroke="#d5dfdb" stroke-width="3"' : ''}/>
+    ${coat ? `<path d="M170 332L200 398L230 332Z" fill="#6cc3b5"/><path d="M150 338L196 452M250 338L204 452" stroke="#d5dfdb" stroke-width="5" fill="none"/><path d="M165 345C150 400 170 432 200 432C230 432 250 400 235 345" stroke="#3b4658" stroke-width="6" fill="none"/><circle cx="200" cy="434" r="11" fill="#3b4658"/>`
+      : `<path d="M162 336Q200 376 238 336" stroke="rgba(0,0,0,.18)" stroke-width="7" fill="none"/><path d="M180 360v40M220 360v40" stroke="rgba(255,255,255,.5)" stroke-width="4" stroke-linecap="round"/>`}
+    <rect x="178" y="282" width="44" height="60" rx="16" fill="${skin}"/>
+  </g>
+  <g class="head">
+    <circle cx="116" cy="228" r="16" fill="${skin}"/><circle cx="284" cy="228" r="16" fill="${skin}"/>
+    <ellipse cx="200" cy="215" rx="86" ry="92" fill="${skin}"/>
+    ${long ? `<path d="M110 222C98 142 148 110 204 112C262 114 306 150 290 222C284 176 250 150 200 156C160 160 128 182 110 222Z" fill="${hair}"/><circle cx="200" cy="112" r="30" fill="${hair}"/>`
+      : `<path d="M112 212C104 140 150 112 204 114C262 116 300 150 288 214C276 180 250 160 214 158C178 156 148 170 130 196Z" fill="${hair}"/>`}
+    <g class="x-bags"><path d="M158 246Q170 256 184 246M216 246Q230 256 242 246" stroke="#9c6a4f" stroke-width="4" stroke-linecap="round" fill="none" opacity=".7"/></g>
+    <g class="br-ok"><path d="M154 190Q170 182 186 188M214 188Q230 182 246 190" stroke="${hair}" ${sw}/></g>
+    <g class="br-worry"><path d="M154 196L186 184M214 184L246 196" stroke="${hair}" ${sw}/></g>
+    <g class="ey-open"><circle cx="170" cy="222" r="8.5" fill="${ink}"/><circle cx="230" cy="222" r="8.5" fill="${ink}"/></g>
+    <g class="ey-happy"><path d="M159 226Q170 212 181 226M219 226Q230 212 241 226" stroke="${ink}" stroke-width="5.5" stroke-linecap="round" fill="none"/></g>
+    <g class="ey-closed"><path d="M159 222Q170 232 181 222M219 222Q230 232 241 222" stroke="${ink}" stroke-width="5.5" stroke-linecap="round" fill="none"/></g>
+    <path d="M200 228Q207 244 198 249" stroke="rgba(0,0,0,.22)" stroke-width="4" fill="none" stroke-linecap="round"/>
+    <g class="x-blush"><circle cx="148" cy="252" r="13" fill="#f28b82" opacity=".45"/><circle cx="252" cy="252" r="13" fill="#f28b82" opacity=".45"/></g>
+    <g class="mo-smile"><path d="M174 264Q200 294 226 264" stroke="${ink}" stroke-width="5.5" stroke-linecap="round" fill="none"/></g>
+    <g class="mo-flat"><path d="M184 272L216 272" stroke="${ink}" stroke-width="5.5" stroke-linecap="round"/></g>
+    <g class="mo-frown"><path d="M180 282Q200 262 220 282" stroke="${ink}" stroke-width="5.5" stroke-linecap="round" fill="none"/></g>
+    <g class="mo-o"><ellipse cx="200" cy="274" rx="9" ry="12" fill="${ink}"/></g>
+  </g></svg>`;
+}
+function postSVG(v) {
+  if (v === 'slide2' || v === 'slide3') {
+    const t = v === 'slide2' ? ['Myth vs Fact', '2 / 3'] : ['Myth:', 'Brushing harder', 'cleans better.'];
+    return `<svg viewBox="0 0 400 400" width="100%" height="100%"><rect width="400" height="400" fill="${v === 'slide2' ? '#fbe9d7' : '#fde3d9'}"/>
+      ${v === 'slide2' ? `<text x="200" y="200" text-anchor="middle" font-family="Georgia" font-size="46" fill="#1c1b18">Myth vs Fact</text><text x="200" y="250" text-anchor="middle" font-family="Inter" font-weight="700" font-size="18" fill="#9a6a4a">SWIPE →</text>`
+        : `<text x="40" y="110" font-family="Inter" font-weight="800" font-size="22" fill="#c7412a" letter-spacing="3">MYTH #3</text><text class="mythtxt" x="40" y="190" font-family="Georgia" font-size="40" fill="#1c1b18">Brushing harder</text><text x="40" y="240" font-family="Georgia" font-size="40" fill="#1c1b18">cleans better.</text><rect x="40" y="290" width="150" height="44" rx="22" fill="#1c1b18"/><text x="115" y="319" text-anchor="middle" font-family="Inter" font-weight="700" font-size="17" fill="#fff">3 / 3</text>`}</svg>`;
+  }
+  const v2 = v === '2';
+  return `<svg viewBox="0 0 400 400" width="100%" height="100%">
+    <rect width="400" height="400" fill="#dff1ec"/><circle cx="310" cy="80" r="130" fill="#c9e9e0"/>
+    <g class="p-logo">${v2 ? `<rect x="22" y="22" width="150" height="42" rx="21" fill="#1c1b18"/><circle cx="46" cy="43" r="12" fill="#ffc53d"/><text x="66" y="50" font-family="Inter" font-weight="800" font-size="18" fill="#fff">SmileCraft</text>`
+      : `<rect x="22" y="22" width="120" height="36" rx="18" fill="#fff"/><circle cx="41" cy="40" r="10" fill="#2a9d8f"/><text x="57" y="46" font-family="Inter" font-weight="700" font-size="15" fill="#1c1b18">SmileCraft</text>`}</g>
+    <path d="M160 110C175 100 190 108 200 112C210 108 225 100 240 110C262 124 258 160 248 185C240 205 238 230 230 250C224 264 212 262 210 246C207 228 204 214 200 214C196 214 193 228 190 246C188 262 176 264 170 250C162 230 160 205 152 185C142 160 138 124 160 110Z" fill="#fff" stroke="#1c1b18" stroke-width="5" stroke-linejoin="round"/>
+    <path d="M270 120l6 14 14 6-14 6-6 14-6-14-14-6 14-6z" fill="#ffc53d"/>
+    <text x="200" y="312" text-anchor="middle" font-family="Georgia" font-size="32" fill="#1c1b18">Healthy smiles</text>
+    <text x="200" y="346" text-anchor="middle" font-family="Georgia" font-size="32" fill="#1c1b18">start here.</text>
+    ${v2 ? `<rect x="100" y="360" width="200" height="30" rx="15" fill="#1c1b18"/><text class="p-phone" x="200" y="381" text-anchor="middle" font-family="Inter" font-weight="800" font-size="17" fill="#ffc53d">Call 98765 43210</text>`
+      : `<text class="p-phone" x="200" y="378" text-anchor="middle" font-family="Inter" font-size="12" fill="#5b6b6a">Call 98765 43210</text>`}
+  </svg>`;
+}
+function build() {
+  document.getElementById('o1-wrap').innerHTML = personSVG('o1', { skin: '#d9a07a', hair: '#2b211c', top: '#55647d' });
+  document.getElementById('o2-wrap').innerHTML = personSVG('o2', { skin: '#d9a07a', hair: '#2b211c', top: '#55647d' });
+  document.getElementById('c1-wrap').innerHTML = personSVG('c1', { skin: '#b97c58', hair: '#1f1a17', coat: true, long: true });
+  document.querySelectorAll('.post').forEach(p => p.innerHTML = postSVG(p.dataset.v));
+  const names = ['post-01.jpg', 'post-02.jpg', 'post-03.jpg', 'post-04.jpg', 'post-05.jpg', 'post-06.jpg', 'post-07.jpg', 'post-08.jpg', 'post-09.jpg', 'post-10.jpg', 'post-11.jpg', 'post-12.jpg', 'carousel.pdf', 'reel.mp4'];
+  document.getElementById('attach').innerHTML = names.map(n => `<div class="chip"><b></b>${n}</div>`).join('');
+  document.getElementById('wave').innerHTML = Array.from({ length: 34 }, (_, i) => `<i style="display:block;width:6px;border-radius:3px;background:#9aa7ba;height:${10 + Math.abs(Math.sin(i * 1.7)) * 34}px"></i>`).join('');
+  const thumbCols = ['#dff1ec', '#e6ecf4', '#f0e6dc', '#e4efe6'];
+  document.querySelectorAll('.tile .thumb').forEach((th, i) => { th.innerHTML = postSVG('1'); th.style.filter = `hue-rotate(${i * 25}deg) saturate(${.5 + i * .1})`; });
+  const rows = [['post-01.jpg', '2.1 MB', '#9fd6c6'], ['post-02.jpg', '1.8 MB', '#f6c99a'], ['carousel.pdf', '8.4 MB', '#f0a18e'], ['smile-reel.mp4', '1.2 GB', '#1c1b18']];
+  document.getElementById('urows').innerHTML = rows.map(([n, s, c], i) => `<div class="urow" id="ur${i}"><div class="ic" style="background:${c}"></div><div class="nm">${n}</div><div class="sz">${s}</div>${i < 3 ? `<div class="bar"><div class="fill"></div></div>` : `<div class="segs">${'<div class="bar"><div class="fill"></div></div>'.repeat(8)}</div>`}<div class="ok">${CHECK('#fff')}</div></div>`).join('') + `<div id="partsnote" style="margin-top:16px"><span class="tag y" style="font-size:17px">Large video · 8 parts, 4 at a time · resumes if the connection drops</span></div>`;
+  document.getElementById('sthumbs').innerHTML = ['1', 'slide2', 'video'].map((v, i) => `<div style="position:relative;width:118px;height:118px;border-radius:14px;overflow:hidden;border:3px solid var(--line)" class="sth">${v === 'video' ? '<div style="width:100%;height:100%;background:linear-gradient(160deg,#1f3b37,#11211f);display:grid;place-items:center;color:#fff;font-size:30px">▶</div>' : postSVG(v)}<div class="ok abs" style="right:6px;top:6px">${CHECK('#fff')}</div></div>`).join('');
+  const notes = [['1', 'Make this bigger'], ['2', 'Use the new logo'], ['3', 'Fix this fact · slide 3'], ['4', 'Slow this bit down · 0:04–0:09']];
+  document.getElementById('clist').innerHTML = notes.map(([n, t]) => `<div class="field crow" style="justify-content:flex-start;gap:12px;font-size:18px;position:relative"><span class="marker" style="position:static;margin:0;width:36px;height:36px;font-size:16px;flex:none">${n}</span><span style="flex:1">${t}</span><span class="tag g done">Fixed</span></div>`).join('');
+  const acts = [['#6b8bd6', 'Viewed by client', 'Tue 10:41'], ['#ff5d40', 'Changes requested · 4 notes', 'Tue 10:43'], ['#f4b92d', 'V2 uploaded', 'Tue 15:20'], ['#9aa5b4', 'Reminder sent automatically', 'Wed 15:20'], ['#1f9d66', 'Approved ✓ · V2', 'Wed 17:02']];
+  document.getElementById('alist').innerHTML = acts.map(([c, t, d]) => `<div class="field arow" style="gap:14px;justify-content:flex-start"><i style="width:16px;height:16px;border-radius:50%;background:${c};display:block;flex:none"></i><span style="flex:1">${t}</span><span style="font:500 16px var(--sans);color:var(--muted)">${d}</span></div>`).join('');
+  const proj = ['November Content', 'Diwali Campaign', 'Summer Collection', 'Brand Refresh'];
+  document.getElementById('drows').innerHTML = proj.map(p => `<div class="urow drow" style="justify-content:space-between;height:66px"><span>${p}</span><span style="position:relative;width:150px;height:34px"><span class="tag o abs st-w" style="right:0">Waiting</span><span class="tag g abs st-a" style="right:0">Approved ✓</span></span></div>`).join('');
+  document.getElementById('dots').innerHTML = [0, 1, 2].map(i => `<i class="dot" style="display:block;width:10px;height:10px;border-radius:50%;background:${i ? '#d9ccb6' : 'var(--ink)'}"></i>`).join('');
+  const steps = ['Upload once', 'Share one link', 'Get exact feedback', 'Move forward'];
+  document.getElementById('hiw').innerHTML = steps.map((s, i) => `<div class="hstep pill" style="padding:18px 28px;background:#fff;font-size:28px;box-shadow:0 10px 26px rgba(38,29,17,.08)"><span style="width:40px;height:40px;border-radius:50%;background:var(--yellow);display:grid;place-items:center;font-size:20px">${i + 1}</span>${s}</div>${i < 3 ? '<div class="harrow" style="font:700 34px var(--sans);color:var(--yellow2)">→</div>' : ''}`).join('');
+  document.getElementById('cta-url').textContent = CTA_URL;
+}
+
+/* ---------- helpers that use layout ---------- */
+let SCALE = 1;
+function pos(sel, ax = .5, ay = .5) {
+  const el = Q(sel)[0], r = el.getBoundingClientRect(), s = document.getElementById('stage').getBoundingClientRect();
+  return [(r.left - s.left + r.width * ax) / SCALE, (r.top - s.top + r.height * ay) / SCALE];
+}
+function relPos(sel, within, ax = .5, ay = .5) {
+  const r = Q(sel)[0].getBoundingClientRect(), s = Q(within)[0].getBoundingClientRect();
+  return [(r.left - s.left + r.width * ax) / SCALE, (r.top - s.top + r.height * ay) / SCALE];
+}
+const exprState = {};
+const EXPR = { br: ['ok', 'worry'], ey: ['open', 'happy', 'closed'], mo: ['smile', 'flat', 'frown', 'o'], x: ['bags', 'blush'] };
+function exprInit(id, st) {
+  exprState[id] = { ...st };
+  for (const cat in EXPR) for (const v of EXPR[cat]) {
+    const on = cat === 'x' ? !!st[v] : st[cat] === v;
+    at(`#${id} .${cat}-${v}`, -1, { o: [on ? 1 : 0, on ? 1 : 0] });
+  }
+}
+function expr(id, t, st) {
+  const cur = exprState[id];
+  for (const k in st) {
+    if (k === 'bags' || k === 'blush') {
+      if (!!cur[k] !== !!st[k]) tw(`#${id} .x-${k}`, t, .25, { o: st[k] ? [0, 1] : [1, 0] });
+    } else if (cur[k] !== st[k]) {
+      tw(`#${id} .${k}-${cur[k]}`, t, .08, { o: [1, 0] }, 'lin');
+      tw(`#${id} .${k}-${st[k]}`, t, .08, { o: [0, 1] }, 'lin');
+    }
+    cur[k] = st[k];
+  }
+}
+let curPos = [1500, 1200], fingPos = [1500, 1300];
+function cmove(t, dur, to) { tw('#cur', t, dur, { x: [curPos[0], to[0]], y: [curPos[1], to[1]] }, 'inOut'); tw('#curring', t, dur, { x: [curPos[0], to[0]], y: [curPos[1], to[1]] }, 'inOut'); curPos = to; }
+at('#curring .ring', -1, { o: [0, 0] });
+function cclick(t) { tw('#cur', t, .1, { s: [1, .82] }); tw('#cur', t + .1, .15, { s: [.82, 1] }); tw('#curring .ring', t, .45, { s: [.3, 1.6], o: [1, 0] }); }
+function fmove(t, dur, to) { tw('#fing', t, dur, { x: [fingPos[0], to[0]], y: [fingPos[1], to[1]] }, 'inOut'); fingPos = to; }
+function ftap(t) { tw('#fing', t, .1, { s: [1, .75] }); tw('#fing', t + .1, .18, { s: [.75, 1] }); }
+function caption(t0, t1, text, kind = '') {
+  const c = document.createElement('div'); c.className = 'caption ' + kind; c.innerHTML = `<div>${text}</div>`;
+  document.getElementById('captions').appendChild(c);
+  c._baseT = 'translateX(-50%)';
+  tw(c, t0, .45, { o: [0, 1], y: [24, 0] }); tw(c, t1 - .35, .35, { o: [1, 0] }, 'lin');
+}
+function tlabel(parent, t0, t1, text, kind = '') {
+  const c = document.createElement('div'); c.className = 'tlabel ' + kind; c.textContent = text;
+  document.getElementById(parent).appendChild(c);
+  tw(c, t0, .4, { o: [0, 1], x: [-20, 0] }); tw(c, t1 - .3, .3, { o: [1, 0] }, 'lin');
+}
+const popIn = (sel, t, d = .45) => tw(sel, t, d, { o: [0, 1], s: [.6, 1] }, 'back');
+const popOut = (sel, t, d = .3) => tw(sel, t, d, { o: [1, 0], s: [1, .85] }, 'in');
+const fadeUp = (sel, t, d = .5, dy = 30) => tw(sel, t, d, { o: [0, 1], y: [dy, 0] });
+const fadeOut = (sel, t, d = .35) => tw(sel, t, d, { o: [1, 0] }, 'lin');
+
+/* ---------- the story ---------- */
+function timeline() {
+  /* layers */
+  vis('#L-struggle', [[0, 41.6]]); vis('#L-intro', [[41.2, 44.4]]); vis('#L-relief', [[43.8, 54.6], [69.6, 94.4]]);
+  vis('#L-client', [[54, 70.4]]); vis('#L-end', [[93.8, DUR + 1]]);
+  tw('#L-intro', 41.2, .3, { o: [0, 1] }, 'lin'); tw('#L-relief', 43.8, .6, { o: [0, 1] }, 'lin');
+  tw('#L-client', 54, .6, { o: [0, 1] }, 'lin'); tw('#L-relief', 69.6, 0, { o: [0, 0] }); tw('#L-relief', 69.6, .6, { o: [0, 1] }, 'lin');
+  tw('#L-end', 93.8, .6, { o: [0, 1] }, 'lin');
+  tw('#cur', -1, 0, { o: [0, 0] }); tw('#curring', -1, 0, { o: [0, 0] }); tw('#fing', -1, 0, { o: [0, 0] });
+
+  exprInit('o1', { br: 'ok', ey: 'happy', mo: 'smile' });
+  exprInit('o2', { br: 'ok', ey: 'open', mo: 'smile', blush: 1 });
+  exprInit('c1', { br: 'ok', ey: 'open', mo: 'flat' });
+
+  /* steam loops */
+  const st1 = Q('#steam1')[0], st2 = Q('#steam2')[0];
+  fx(0, 0, (p, t) => { st1.style.transform = `translateY(${-((t * 14) % 14)}px)`; st1.style.opacity = Math.max(0, Math.min(.9, (24 - t) / 3)); st2.style.transform = `translateY(${-((t * 14) % 14)}px)`; st2.style.opacity = .9; });
+
+  /* ===== S1 · Monday 9:02 (0–6) ===== */
+  tlabel('L-struggle', .2, 6, 'Monday · 9:02 AM', 'struggle');
+  fadeUp('#email', .4, .6, 40);
+  document.querySelectorAll('#attach .chip').forEach((c, i) => popIn(c, .9 + i * .09, .3));
+  at('#cur', .5, { o: [0, 1] }); at('#cur', 5.8, { o: [1, 0] }); at('#curring', .5, { o: [0, 1] }); at('#curring', 5.8, { o: [1, 0] });
+  curPos = [1300, 900]; cmove(2.4, 1.0, pos('#sendbtn', .45, .5)); cclick(3.5);
+  tw('#sendbtn', 3.5, .15, { s: [1, .9] }); tw('#sendbtn', 3.65, .2, { s: [.9, 1] });
+  tw('#email', 3.9, .7, { s: [1, .08], x: [0, 560], y: [0, -380], o: [1, 0] }, 'in');
+  popIn('#sent', 4.5); fadeOut('#sent', 5.7);
+  expr('o1', 1, { ey: 'open' }); expr('o1', 4.5, { ey: 'happy' });
+  tw('#o1 .head', 4.5, .25, { y: [0, -10] }); tw('#o1 .head', 4.75, .3, { y: [-10, 0] });
+  caption(.6, 5.9, 'Monday. October content, done. Sent to the client.', 'struggle');
+
+  /* ===== S2 · Feedback from everywhere (6–16) ===== */
+  const notifs = ['#n1', '#n2', '#n3', '#n4', '#n5'];
+  const rots = [-3, 2, -2, 3, -1];
+  notifs.forEach((n, i) => { tw(n, 6.3 + i * .9, .45, { o: [0, 1], s: [.5, 1], r: [rots[i] * 3, rots[i]] }, 'back'); });
+  at('#badge', 0, { o: [0, 0] }); popIn('#badge', 6.4); count('#badge', 6.4, 7, 1, 23);
+  tw('#badge', 11, .12, { s: [1, 1.25] }); tw('#badge', 11.12, .2, { s: [1.25, 1] });
+  popIn('#q1', 11.2); tw('#q1', 11.2, 0, { r: [-4, -4] });
+  popIn('#q2', 11.9); popIn('#q3', 12.6, .55);
+  const sh = Q('#shake')[0];
+  fx(13.1, .7, (p, t) => { sh.style.transform = p > 0 && p < 1 ? `translate(${Math.sin(t * 80) * 10 * (1 - p)}px,${Math.cos(t * 70) * 4 * (1 - p)}px)` : ''; });
+  tw('#o1 .head', 7, .4, { r: [0, -5] }); tw('#o1 .head', 9, .4, { r: [-5, -9] }); tw('#o1 .head', 11, .4, { r: [-9, -13] });
+  expr('o1', 7, { ey: 'open', mo: 'flat' }); expr('o1', 8.2, { br: 'worry' }); expr('o1', 10.2, { mo: 'frown' }); expr('o1', 12.6, { mo: 'o' });
+  [...notifs, '#q1', '#q2', '#q3', '#badge'].forEach((n, i) => tw(n, 15.2 + i * .04, .4, { o: [1, 0], y: [0, 40] }, 'in'));
+  caption(6.4, 15.8, 'Then the feedback arrives… from everywhere.', 'struggle');
+
+  /* ===== S3 · Version maze (16–24) ===== */
+  tw('#o1 .head', 16, .5, { r: [-13, 6] });
+  expr('o1', 16, { mo: 'flat' });
+  fadeUp('#finder', 16.1, .6, 40);
+  ['#tile0', '#tile1', '#tile2', '#tile3'].forEach((t, i) => popIn(t, 16.6 + i * .18, .4));
+  const slot = [0, 1, 2, 3]; let ts = 18.2; const SW = 255;
+  const xs = [0, 0, 0, 0];
+  [[0, 2], [1, 3], [0, 1], [2, 3], [1, 2], [0, 3]].forEach(([a, b], k) => {
+    const sa = slot[a], sb = slot[b], d = Math.max(.34, .52 - k * .03);
+    const na = (sb - a) * SW, nb = (sa - b) * SW;
+    tw('#tile' + a, ts, d, { x: [xs[a], na] }, 'inOut'); tw('#tile' + b, ts, d, { x: [xs[b], nb] }, 'inOut');
+    tw('#tile' + a, ts, d / 2, { y: [0, -50] }); tw('#tile' + a, ts + d / 2, d / 2, { y: [-50, 0] }, 'in');
+    tw('#tile' + b, ts, d / 2, { y: [0, 50] }); tw('#tile' + b, ts + d / 2, d / 2, { y: [50, 0] }, 'in');
+    xs[a] = na; xs[b] = nb; slot[a] = sb; slot[b] = sa; ts += d + .06;
+  });
+  ['#tile0', '#tile1', '#tile2', '#tile3'].forEach(t => tw(t, 21.2, .4, { o: [1, .35] }));
+  at('#bigq', 0, { o: [0, 0] }); tw('#bigq', 21.3, .5, { o: [0, .92], s: [.4, 1], r: [-20, 0] }, 'back');
+  expr('o1', 21.3, { mo: 'o' });
+  tw('#finder', 23.5, .45, { o: [1, 0], y: [0, 40] }, 'in');
+  caption(16.4, 23.9, 'Wait… which one did they actually approve?', 'struggle');
+
+  /* ===== S4 · The chase (24–32) ===== */
+  tlabel('L-struggle', 24.1, 31.8, 'Tue → Wed → Thu', 'struggle');
+  fadeUp('#cal', 24.2, .5); fadeUp('#chat', 24.4, .5);
+  const days = Q('#days .day');
+  at(days[0], 0, { o: [1, 1] }); at(days[1], 0, { o: [0, 0] }); at(days[2], 0, { o: [0, 0] });
+  tw(days[0], 26.8, .35, { o: [1, 0], y: [0, -60] }); tw(days[1], 26.8, .4, { o: [0, 1], y: [60, 0] });
+  tw(days[1], 28.8, .35, { o: [1, 0], y: [0, -60] }); tw(days[2], 28.8, .4, { o: [0, 1], y: [60, 0] });
+  fadeUp('#m1', 25.2, .4, 20); fadeUp('#mm1', 25.5, .3, 10);
+  fadeUp('#m2', 27.2, .4, 20); fadeUp('#mm2', 27.5, .3, 10);
+  fadeUp('#m3', 29.2, .4, 20); fadeUp('#mm3', 29.5, .3, 10);
+  at('#typing', 0, { o: [0, 0] }); popIn('#typing', 30.1, .3); popOut('#typing', 30.9, .25);
+  fx(29, 0, (p, t) => { const l = Q('#launch')[0]; const on = t >= 29; l.style.background = on ? '#fbe2de' : '#eef1f5'; l.style.color = on ? '#b0402f' : 'var(--s-ink)'; });
+  fx(29, 3, (p, t) => { Q('#launch')[0].style.transform = p > 0 && p < 1 ? `scale(${1 + Math.max(0, Math.sin(t * 9)) * .07})` : ''; });
+  expr('o1', 25, { mo: 'flat', br: 'worry' }); expr('o1', 29.3, { mo: 'frown', bags: 1 }); expr('o1', 31, { mo: 'o' }); expr('o1', 31.4, { mo: 'frown' });
+  tw('#o1 .head', 24.5, .5, { r: [6, 0] });
+  tw(['#cal', '#chat'], 31.5, .5, { o: [1, 0] }, 'lin');
+  caption(25, 31.8, 'Thursday. Still waiting. Launch is Monday.', 'struggle');
+
+  /* ===== S5 · 11:48 PM (32–38) ===== */
+  at('#night', 0, { o: [0, 0] }); tw('#night', 32, 1, { o: [0, 1] }, 'lin');
+  at('#glow', 0, { o: [0, 0] }); tw('#glow', 32.4, 1, { o: [0, 1] }, 'lin');
+  tlabel('L-struggle', 32.6, 38.4, 'Thursday · 11:48 PM', 'night');
+  at('#unread', 0, { o: [0, 0] }); tw('#unread', 33.2, .8, { o: [0, 1], y: [30, 0] });
+  expr('o1', 34.2, { ey: 'closed' });
+  tw('#o1', 34.2, 1.1, { y: [0, 60] }, 'inOut'); tw('#o1 .head', 34.2, 1.1, { r: [0, -8], y: [0, 26] }, 'inOut');
+  tw('#unread', 37.6, .4, { o: [1, 0] });
+  caption(34, 38.2, 'There has to be a better way.', 'night');
+
+  /* ===== S6 · The switch (38–44) ===== */
+  at('#flood', 0, { o: [0, 0] });
+  tw('#flood', 38.5, .12, { o: [0, 1], s: [.6, 1] }); tw('#flood', 38.7, .12, { o: [1, .2] }); tw('#flood', 38.85, .15, { o: [.2, 1] });
+  tw('#flood', 39.2, .3, { s: [1, 1.15] }); tw('#flood', 39.5, .3, { s: [1.15, 1] });
+  expr('o1', 39.4, { ey: 'open', mo: 'o', br: 'ok' });
+  tw('#o1', 39.4, .5, { y: [60, 0] }, 'out'); tw('#o1 .head', 39.4, .5, { r: [-8, 6], y: [26, 0] }, 'out');
+  tw('#floodcheck', 40.3, .25, { o: [1, 0] });
+  tw('#flood', 40.4, 1.0, { s: [1, 48], r: [0, 45] }, 'in');
+  at('#intro-lock', 0, { o: [0, 0] }); tw('#intro-lock', 41.5, .6, { o: [0, 1], s: [.85, 1] }, 'back');
+  fadeUp('#intro-line', 42.1, .6);
+  tw('#L-intro', 43.9, .5, { o: [1, 0] }, 'lin');
+
+  /* ===== S7 · Next month (44–54) ===== */
+  tlabel('L-relief', 44.2, 53.8, 'Next month · Monday 9:02 AM');
+  tw('#appwin', 44.3, .6, { o: [0, 1], y: [50, 0] });
+  const panels = ['#p-upload', '#p-send', '#p-link', '#p-review', '#p-dash'];
+  panels.forEach(p => at(p, -1, { o: [0, 0] }));
+  at('#p-upload', 44.3, { o: [0, 1] });
+  at('#cur', 44.6, { o: [0, 1] }); at('#curring', 44.6, { o: [0, 1] });
+  // files dropping
+  const ur = Q('#urows .urow');
+  ur.forEach((r, i) => fadeUp(r, 45.4 + i * .15, .35, 16));
+  ur.forEach((r, i) => { if (i < 3) tw(Q('.fill', r), 45.9 + i * .1, .7 + i * .15, { wp: [0, 100] }, 'inOut'); popIn(Q('.ok', r), i < 3 ? 46.7 + i * .25 : 48.0, .3); });
+  const segFills = Q('#ur3 .segs .fill');
+  segFills.forEach((f, i) => tw(f, 46.0 + Math.floor(i / 4) * .9 + (i % 4) * .08, .75, { wp: [0, 100] }, 'inOut'));
+  at('#partsnote', 0, { o: [0, 0] }); fadeUp('#partsnote', 46.2, .4, 12);
+  tw('#drop', 45.0, .15, { s: [1, 1.03] }); tw('#drop', 45.15, .25, { s: [1.03, 1] });
+  curPos = [1500, 900]; cmove(44.6, .5, pos('#drop', .5, .5)); cclick(45.1);
+  cmove(48.1, .5, [1400, 780]);
+  // send panel
+  tw('#p-upload', 48.2, .3, { o: [1, 0] }, 'lin'); tw('#p-send', 48.3, .35, { o: [0, 1], y: [20, 0] });
+  Q('#sthumbs .sth').forEach((s, i) => { popIn(Q('.ok', s), 48.9 + i * .22, .3); cls(s, 48.9 + i * .22, 'picked'); });
+  fx(48.9, 0, (p, t) => Q('#sthumbs .sth').forEach((s, i) => s.style.borderColor = t >= 48.9 + i * .22 ? 'var(--yellow2)' : 'var(--line)'));
+  cmove(49.3, .45, pos('#tog', .5, .5)); cclick(49.8);
+  cls('#tog', 49.85, 'on'); tw('#knob', 49.85, .2, { x: [0, 26] });
+  at(['#rem1', '#rem2'], 0, { o: [0, 0] }); popIn('#rem1', 50.0, .3); popIn('#rem2', 50.15, .3);
+  cmove(50.3, .5, pos('#sendreq', .5, .5)); cclick(50.85);
+  tw('#sendreq', 50.85, .12, { s: [1, .92] }); tw('#sendreq', 50.97, .2, { s: [.92, 1] });
+  // link panel
+  tw('#p-send', 51.2, .3, { o: [1, 0] }, 'lin'); tw('#p-link', 51.3, .4, { o: [0, 1], s: [.96, 1] });
+  cmove(51.5, .5, pos('#copybtn', .5, .5)); cclick(52.1);
+  at('#copy2', 0, { o: [0, 0] }); at('#copy1', 52.1, { o: [1, 0] }); at('#copy2', 52.1, { o: [0, 1] });
+  tw('#linkfield', 52.5, .15, { s: [1, 1.04] }); tw('#linkfield', 52.65, .9, { x: [0, 1200], y: [0, -520], r: [0, -18], s: [1.04, .3], o: [1, 0] }, 'in');
+  at('#cur', 53.4, { o: [1, 0] }); at('#curring', 53.4, { o: [1, 0] });
+  tw('#p-link', 53.9, .5, { o: [1, 0] }, 'lin');
+  caption(44.6, 54, 'Upload once. Send one link.');
+
+  /* ===== S8 · The client, between patients (54–70) ===== */
+  tlabel('L-client', 54.3, 69.8, 'Meanwhile · at the clinic');
+  tw('#phone', 54.1, .6, { o: [0, 1], y: [80, 0] });
+  at('#rapp', 0, { o: [0, 0] });
+  at('#fing', 54.6, { o: [0, 1] }); at('#fing', 69, { o: [1, 0] });
+  fingPos = [1500, 1000];
+  fadeUp('#lnotif', 54.5, .5, -30);
+  fmove(54.6, .5, pos('#lnotif', .5, .5)); ftap(55.15);
+  tw('#rapp', 55.3, .4, { o: [0, 1], s: [.94, 1] });
+  at('#nologin', 0, { o: [0, 0] }); popIn('#nologin', 55.8, .5); tw('#nologin', 56.3, .25, { s: [1, 1.12] }); tw('#nologin', 56.55, .25, { s: [1.12, 1] });
+  at('#video', 0, { o: [0, 0] }); at('#vtl', 0, { o: [0, 0] }); at('#rbox', 0, { o: [0, 0] });
+  const tools = Q('#tools .tool');
+  function toolWindow(i, a, b) { fx(0, 0, (p, t) => { if (t >= a && t < b) { tools[i].style.background = 'var(--yellow)'; tools[i].style.borderColor = 'var(--ink)'; } }); }
+  fx(0, 0, () => tools.forEach(tl => { tl.style.background = '#fff'; tl.style.borderColor = 'var(--line)'; }));
+  toolWindow(0, 56.2, 58.6); toolWindow(1, 58.8, 61.2); toolWindow(0, 62.4, 63.8); toolWindow(3, 64.6, 66.8);
+  // marker 1 on phone number
+  const ph = relPos('#strip .post:first-child .p-phone', '#pscreen', .5, .5);
+  const P = sel => pos(sel, .5, .5);
+  const toolPos = i => pos(tools[i], .5, .5);
+  const scr = pos('#pscreen', 0, 0);
+  const S = (x, y) => [scr[0] + x, scr[1] + y];
+  fmove(55.9, .4, toolPos(0)); ftap(56.3);
+  fmove(56.5, .45, S(...ph)); ftap(57);
+  const place = (m, b, xy, t, text, bx = -40, by = -70) => {
+    Q(m)[0].style.left = xy[0] + 'px'; Q(m)[0].style.top = xy[1] + 'px';
+    Q(b)[0].style.left = (xy[0] + bx) + 'px'; Q(b)[0].style.top = (xy[1] + by) + 'px';
+    at(m, 0, { o: [0, 0] }); popIn(m, t, .4);
+    at(b, 0, { o: [0, 0] }); popIn(b, t + .2, .3); type(b, t + .3, .7, text); popOut(b, t + 1.6, .3);
+  };
+  place('#pm1', '#pb1', ph, 57.05, 'Make this bigger', -90, -80);
+  // box around logo
+  fmove(58.4, .4, toolPos(1)); ftap(58.8);
+  const lg0 = relPos('#strip .post:first-child .p-logo', '#aview', 0, 0), lg1 = relPos('#strip .post:first-child .p-logo', '#aview', 1, 1);
+  const bx0 = [lg0[0] - 8, lg0[1] - 8], bw = lg1[0] - lg0[0] + 16, bh = lg1[1] - lg0[1] + 16;
+  Q('#rbox')[0].style.left = bx0[0] + 'px'; Q('#rbox')[0].style.top = bx0[1] + 'px';
+  const av = relPos('#aview', '#pscreen', 0, 0);
+  fmove(59.0, .35, S(av[0] + bx0[0], av[1] + bx0[1])); ftap(59.35);
+  at('#rbox', 59.4, { o: [0, 1] }); tw('#rbox', 59.4, .6, { w: [0, bw], h: [0, bh] }, 'inOut');
+  tw('#fing', 59.4, .6, { x: [fingPos[0], fingPos[0] + bw], y: [fingPos[1], fingPos[1] + bh] }, 'inOut'); fingPos = [fingPos[0] + bw, fingPos[1] + bh];
+  place('#pm2', '#pb2', [av[0] + bx0[0] + bw, av[1] + bx0[1] + bh], 60.05, 'Use the new logo', -60, 36);
+  // carousel
+  fmove(61.3, .35, S(330, 380));
+  tw('#fing', 61.7, .7, { x: [fingPos[0], fingPos[0] - 220] }, 'inOut'); fingPos = [fingPos[0] - 220, fingPos[1]];
+  tw('#strip', 61.7, .8, { x: [0, -800] }, 'inOut');
+  tw(['#rbox', '#pm1', '#pm2'], 61.6, .2, { o: [1, 0] });
+  const dots = Q('#dots .dot'); fx(0, 0, (p, t) => { const idx = t < 62 ? 0 : 2; dots.forEach((d, i) => d.style.background = i === idx ? 'var(--ink)' : '#d9ccb6'); });
+  fmove(62.5, .35, toolPos(0)); ftap(62.85);
+  const myth = [av[0] + 150, av[1] + 180];
+  fmove(63.0, .35, S(...myth)); ftap(63.35);
+  place('#pm3', '#pb3', myth, 63.4, 'Fix this fact', -40, 36);
+  // video
+  tw('#pm3', 64.4, .2, { o: [1, 0] }); at('#dots', 64.4, { o: [1, 0] });
+  tw('#video', 64.4, .4, { o: [0, 1] }); tw('#vtl', 64.4, .4, { o: [0, 1] });
+  at('#vrange', 0, { o: [0, 0] }); at('#vlabel', 0, { o: [0, 0] });
+  fmove(64.5, .35, toolPos(3)); ftap(64.85);
+  const tlw = Q('#vtl')[0].getBoundingClientRect().width / SCALE;
+  const vtl = relPos('#vtl', '#pscreen', 0, .5);
+  tw('#vhead', 64.9, .8, { l: [0, tlw * .6] }, 'inOut'); tw('#vhead', 65.7, .4, { l: [tlw * .6, tlw * .267] }, 'inOut');
+  fmove(64.95, .8, S(vtl[0] + tlw * .6, vtl[1])); fmove(65.75, .4, S(vtl[0] + tlw * .267, vtl[1]));
+  Q('#vrange')[0].style.left = (tlw * .267) + 'px'; Q('#vlabel')[0].style.left = (tlw * .267) + 'px';
+  at('#vrange', 66.15, { o: [0, 1] }); tw('#vrange', 66.15, .5, { w: [0, tlw * .333] }, 'inOut'); tw('#vhead', 66.15, .5, { l: [tlw * .267, tlw * .6] }, 'inOut');
+  fmove(66.15, .5, S(vtl[0] + tlw * .6, vtl[1]));
+  popIn('#vlabel', 66.6, .3);
+  place('#pm4', '#pb4', [vtl[0] + tlw * .433, vtl[1] - 12], 66.7, 'Slow this bit down', -120, -80);
+  // request changes
+  fmove(67.3, .45, P('#reqbtn')); ftap(67.8);
+  tw('#reqbtn', 67.8, .12, { s: [1, .93] }); tw('#reqbtn', 67.92, .2, { s: [.93, 1] });
+  at('#bundle', 0, { o: [0, 0] });
+  const bpos = relPos('#bundle', '#pscreen', .5, .5);
+  ['#pm1', '#pm2', '#pm3', '#pm4'].forEach((m, i) => {
+    const el = Q(m)[0]; const mx = parseFloat(el.style.left), my = parseFloat(el.style.top);
+    const dx = bpos[0] - mx, dy = bpos[1] - my;
+    at(m, 68.0, { o: [0, 1] });
+    tw(m, 68.0 + i * .06, .45, { x: [0, dx], y: [0, dy], s: [1, .5] }, 'inOut');
+    at(m, 68.55, { o: [1, 0] });
+  });
+  popIn('#bundle', 68.5, .3); tw('#bundle', 68.9, .5, { y: [0, -500], s: [1, .5], o: [1, 0] }, 'in');
+  at('#sentbar', 0, { o: [0, 0] }); fadeUp('#sentbar', 69.1, .35, -20);
+  at('#pm4', 0, { o: [0, 0] });
+  // step list
+  Q('#steps .step').forEach((s, i) => { fadeUp(s, 55.9 + i * .15, .4, 16); at(Q('.ok', s), 0, { o: [0, 0] }); });
+  [58.2, 61.0, 64.2, 67.4].forEach((t, i) => { const s = Q('#steps .step')[i]; popIn(Q('.ok', s), t, .35); fx(t, 0, p => s.style.color = p >= 1 ? 'var(--ink)' : 'var(--muted)'); });
+  expr('c1', 56.2, { mo: 'smile' }); expr('c1', 69.0, { ey: 'happy', blush: 1 });
+  at('#ninety', 0, { o: [0, 0] }); popIn('#ninety', 69.0, .45);
+  caption(55.6, 70.2, 'No login. No guessing. Every note, exactly where it belongs.');
+
+  /* ===== S9 · Clear feedback (70–78) ===== */
+  tlabel('L-relief', 70.2, 77.8, 'Back at the studio');
+  expr('o2', 70, { ey: 'open', mo: 'smile' });
+  at('#p-review', 69.6, { o: [0, 1] });
+  at('#v2', 0, { o: [0, 0] });
+  const v1post = Q('#v1 .post')[0];
+  const mk = [['1', '.p-phone'], ['2', '.p-logo']];
+  mk.forEach(([n, sel], i) => {
+    const m = document.createElement('div'); m.className = 'marker rvm'; m.textContent = n; v1post.appendChild(m);
+    const xy = relPos(v1post.querySelector(sel), v1post, sel === '.p-logo' ? 1 : .5, .5);
+    m.style.left = xy[0] + 'px'; m.style.top = xy[1] + 'px';
+    at(m, 0, { o: [0, 0] }); popIn(m, 70.8 + i * .25, .35);
+  });
+  Q('#clist .crow').forEach((r, i) => { fadeUp(r, 71.2 + i * .25, .4, 16); at(Q('.done', r), 0, { o: [0, 0] }); popIn(Q('.done', r), 74.4 + i * .2, .3); });
+  tw('#v1', 73.2, .6, { s: [1, .74], x: [0, -60], y: [0, -60], o: [1, .6] }, 'inOut');
+  tw('#v2', 73.4, .7, { o: [0, 1], x: [260, 40], y: [0, 40], s: [.86, .86] }, 'out');
+  expr('o2', 73.6, { ey: 'happy' });
+  caption(70.6, 77.8, 'Clear feedback. Clean versions.');
+  tw('#appwin', 77.6, .45, { o: [1, 0], y: [0, 30] }, 'in');
+
+  /* ===== S10 · No more chasing (78–84) ===== */
+  tlabel('L-relief', 78.2, 83.8, 'The client got busy…');
+  at(['#clock', '#inbox', '#nochase'], 0, { o: [0, 0] });
+  popIn('#clock', 78.2, .5);
+  tw('#mhand', 78.6, 1.8, { r: [0, 720] }, 'inOut'); tw('#hhand', 78.6, 1.8, { r: [30, 90] }, 'inOut');
+  at('#plus24', 0, { o: [0, 0] }); popIn('#plus24', 79.8, .4);
+  tw('#inbox', 80.2, .55, { o: [0, 1], x: [80, 0] });
+  at('#remrow', 0, { o: [0, 0] }); tw('#remrow', 80.7, .5, { o: [0, 1], y: [-40, 0] }, 'back');
+  popIn('#nochase', 81.6, .4);
+  expr('o2', 80.8, { ey: 'closed', mo: 'smile' });
+  tw('#o2', 80.8, .8, { r: [0, -4], x: [0, -14] }, 'inOut'); tw('#o2', 83.4, .5, { r: [-4, 0], x: [-14, 0] }, 'inOut');
+  tw(['#clock', '#inbox', '#nochase'], 83.5, .4, { o: [1, 0] }, 'lin');
+  caption(78.5, 83.8, 'ApproveFlow sends the reminders. You don\'t have to.');
+
+  /* ===== S11 · Approved (84–94) ===== */
+  expr('o2', 84, { ey: 'open' });
+  tlabel('L-relief', 84.2, 90.8, 'Wednesday');
+  at(['#apcard', '#activity', '#stamp', '#modal'], 0, { o: [0, 0] });
+  fadeUp('#apcard', 84.1, .5, 40);
+  at('#fing', 84.4, { o: [0, 1] }); at('#fing', 86.9, { o: [1, 0] });
+  fingPos = [1300, 1000]; fmove(84.4, .6, P('#apbtn')); ftap(85.1);
+  tw('#modal', 85.3, .3, { o: [0, 1] }, 'lin');
+  fmove(85.6, .4, P('#confirm')); ftap(86.1);
+  tw('#confirm', 86.1, .12, { s: [1, .95] }); tw('#confirm', 86.22, .2, { s: [.95, 1] });
+  tw('#modal', 86.35, .25, { o: [1, 0] }, 'lin');
+  tw('#stamp', 86.6, .35, { o: [0, 1], s: [2.4, 1] }, 'in');
+  fx(86.95, .4, (p, t) => { const c = Q('#apcard')[0]; c.style.transform = p > 0 && p < 1 ? `translate(${Math.sin(t * 90) * 6 * (1 - p)}px,0)` : ''; });
+  expr('o2', 86.9, { ey: 'happy', mo: 'smile' });
+  tw('#o2', 86.9, .25, { y: [0, -18] }); tw('#o2', 87.15, .35, { y: [-18, 0] }, 'back');
+  tw('#activity', 87.6, .5, { o: [0, 1], x: [60, 0] });
+  Q('#alist .arow').forEach((r, i) => fadeUp(r, 88.0 + i * .35, .35, 16));
+  caption(84.4, 87.4, 'Approve in one tap.');
+  caption(87.6, 90.9, 'Every version. Every decision. On record.');
+  tw(['#apcard', '#activity'], 90.6, .4, { o: [1, 0] }, 'lin');
+  // dashboard
+  at('#p-review', 90.9, { o: [1, 0] }); at('#p-dash', 90.9, { o: [0, 1] });
+  tw('#appwin', 90.9, .5, { o: [0, 1], y: [30, 0] });
+  Q('#drows .drow').forEach((r, i) => { at(Q('.st-a', r), 0, { o: [0, 0] }); tw(Q('.st-w', r), 91.6 + i * .25, .2, { o: [1, 0] }); popIn(Q('.st-a', r), 91.6 + i * .25, .35); });
+  count('#kpi1', 91.5, 1.4, 0, 38); count('#kpi2', 91.5, 1.2, 4, 0); count('#kpi3', 91.5, 1.2, 0, 11);
+  at('#clock530', 0, { o: [0, 0] }); popIn('#clock530', 92.2, .4);
+  tw('#lid', 93.0, .5, { sy: [1, .08] }, 'in');
+  caption(91.2, 94.2, 'Home by 5:30.');
+
+  /* ===== End card (94–100) ===== */
+  at('#end-lock', 0, { o: [0, 0] }); tw('#end-lock', 94.3, .6, { o: [0, 1], s: [.85, 1] }, 'back');
+  fadeUp('#end-line', 94.9, .5);
+  Q('#hiw > *').forEach((el, i) => fadeUp(el, 95.5 + i * .18, .4, 20));
+  at('#cta', 0, { o: [0, 0] }); popIn('#cta', 97.1, .5); fadeUp('#cta-url', 97.4, .4, 10);
+  tw('#cta', 98.2, .25, { s: [1, 1.05] }); tw('#cta', 98.45, .3, { s: [1.05, 1] });
+
+  sortTracks();
+}
+
+/* ---------- player ---------- */
+const frame = document.getElementById('frame');
+const RENDER = new URLSearchParams(location.search).has('render');
+if (RENDER) document.body.classList.add('render');
+function fit() {
+  if (RENDER) { SCALE = 1; frame.style.transform = ''; return; }
+  const vp = document.getElementById('viewport').getBoundingClientRect();
+  SCALE = Math.min(vp.width / 1920, vp.height / 1080);
+  frame.style.transform = `scale(${SCALE})`;
+  frame.style.width = '1920px'; frame.parentElement.style.placeItems = 'center';
+  frame.style.marginRight = `${1920 * SCALE - 1920}px`; frame.style.marginBottom = `${1080 * SCALE - 1080}px`;
+}
+let T = 0, playing = !RENDER, last = null;
+const scrub = document.getElementById('scrub'), timeEl = document.getElementById('time'), playBtn = document.getElementById('play');
+scrub.max = DUR;
+const fmt = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+function seek(t) { T = Math.max(0, Math.min(DUR, t)); render(T); scrub.value = T; timeEl.textContent = `${fmt(T)} / ${fmt(DUR)}`; }
+function loop(ts) {
+  if (playing) { if (last != null) seek(T + (ts - last) / 1000); if (T >= DUR) { playing = false; playBtn.textContent = '▶'; } }
+  last = ts; requestAnimationFrame(loop);
+}
+playBtn.onclick = () => { if (T >= DUR) seek(0); playing = !playing; playBtn.textContent = playing ? '❚❚' : '▶'; };
+document.getElementById('restart').onclick = () => { seek(0); playing = true; playBtn.textContent = '❚❚'; };
+scrub.oninput = () => { seek(+scrub.value); };
+addEventListener('keydown', e => { if (e.code === 'Space') { e.preventDefault(); playBtn.click(); } if (e.code === 'ArrowRight') seek(T + 2); if (e.code === 'ArrowLeft') seek(T - 2); });
+addEventListener('resize', fit);
+window.seek = seek;
+
+(async () => {
+  build(); fit();
+  try { await Promise.race([document.fonts.ready, new Promise(r => setTimeout(r, 2500))]); } catch (e) {}
+  timeline();
+  const t0 = parseFloat(new URLSearchParams(location.search).get('t') || '0');
+  seek(t0);
+  window.READY = true;
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

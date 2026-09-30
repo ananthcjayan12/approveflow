@@ -20,12 +20,12 @@ The interface follows the selected Srshti Creative Studio direction: charcoal/bl
 ## Quick start
 
 ```bash
-npm install
+npm ci
 npm run db:migrate:local
 npm run dev
 ```
 
-The web app runs on Vite and the Worker runs via Wrangler. For visual-only development, `npm run dev -w apps/web` is enough; the app contains demo data and local interactive flows.
+The web app runs on Vite and the Worker runs via Wrangler. Run both services for the functional trial. Local uploads up to 100 MiB use local R2 storage; production uploads go directly to R2.
 
 ## Zero-touch Cloudflare deployment
 
@@ -50,6 +50,8 @@ Existing resources are detected and reused, so the workflow is safe to run repea
 
 ### GitHub secrets
 
+Everything is configured through GitHub Actions secrets only — no manual Cloudflare setup and no config files to edit. Add or update secrets, then push to `main`.
+
 Required for Cloudflare provisioning/deployment:
 
 - `CLOUDFLARE_API_TOKEN`
@@ -62,7 +64,6 @@ Required for direct R2 browser upload signing:
 
 Optional application integrations:
 
-- `SESSION_SECRET`
 - `RESEND_API_KEY`
 - `RAZORPAY_KEY_ID`
 - `RAZORPAY_KEY_SECRET`
@@ -70,9 +71,9 @@ Optional application integrations:
 
 The Cloudflare API token needs permission to manage Workers, D1 and R2. If `APP_ORIGIN` is a custom domain, the token also needs the permissions required to bind that Worker custom domain.
 
-### GitHub variables
+### Optional settings
 
-All variables below are optional unless the corresponding integration is enabled:
+These are also read from GitHub secrets. Because they are not sensitive, you may store them as repository variables with the same name instead; a secret wins if both exist. All are optional unless the corresponding integration is enabled:
 
 - `APP_ORIGIN` — e.g. `https://approve.example.com`. If omitted, the workflow uses `https://<WORKER_NAME>.<account>.workers.dev`.
 - `WORKER_NAME` — defaults to `approveflow`
@@ -86,11 +87,11 @@ All variables below are optional unless the corresponding integration is enabled
 - `RAZORPAY_PLAN_FREELANCER`
 - `RAZORPAY_PLAN_AGENCY`
 
-If Razorpay credentials are supplied, all three Razorpay plan variables and the webhook secret are required.
+If Razorpay credentials are supplied, all three Razorpay plan IDs and the webhook secret are required.
 
 ### Deploy
 
-After the GitHub settings above are configured, merge/push to `main`. The production workflow does the rest.
+After the GitHub secrets above are configured, merge/push to `main`. The production workflow does the rest.
 
 You can also trigger **Deploy ApproveFlow to Cloudflare** manually from GitHub Actions.
 
@@ -111,3 +112,24 @@ wrangler.generated.json
 - R2 S3 credentials are still supplied as GitHub secrets because they are used to sign direct browser uploads. The bucket itself is created automatically.
 
 See `docs/DEPLOYMENT.md` for the complete setup and `docs/ARCHITECTURE.md` for the data-flow design.
+
+## Functional trial
+
+Create an account at `/signup`, then add a client and project. Upload images,
+PDFs or videos, select the assets in **Send for approval**, and copy the generated
+link to another browser. Reviewers can save comments, pin feedback to images,
+comment on video timestamps/ranges, and approve or request changes without an
+account. The designer can read and reply to feedback and upload a new version.
+The dashboard, activity and storage screens use saved workspace data.
+
+Carousel slides are uploaded as individual images for this trial. PDFs support
+preview and text comments (include the page number). Drawing/rectangle tools,
+side-by-side version comparison, team management, password recovery and email
+verification are not implemented. Unavailable demo controls have been removed.
+Email delivery requires Resend; without it, copy/share links work normally.
+Billing remains unavailable unless Razorpay is configured.
+
+Run `npm run build && npm run test:trial` to exercise the complete API workflow
+against an isolated local Worker, D1 database and R2 bucket. This creates temporary
+test accounts and storage, removes them afterwards, and never uses production data.
+GitHub runs this check before provisioning or deploying.

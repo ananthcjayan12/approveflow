@@ -17,7 +17,7 @@ export default function Landing() {
           <div className="eyebrow warm">UPLOAD · SHARE · REVIEW · APPROVE</div>
           <h1>Client <span>approval</span> without the chaos.</h1>
           <p>Send images, carousels, captions and video through one clean link. Clients can mark exactly what needs changing — no account required.</p>
-          <div className="hero-actions"><Link className="button button-primary large" to="/signup">Start free <ArrowUpRight size={18}/></Link><Link className="button button-ghost large" to="/review/demo"><Play size={16}/> See client review</Link></div>
+          <div className="hero-actions"><Link className="button button-primary large" to="/signup">Start free <ArrowUpRight size={18}/></Link><Link className="button button-ghost large" to="/signup"><Play size={16}/> Try client approvals</Link></div>
           <div className="micro-benefits"><span><CheckCircle2/> No client logins</span><span><CheckCircle2/> Visual annotations</span><span><CheckCircle2/> Automatic reminders</span></div>
         </div>
         <div className="hero-stage" aria-label="Product preview">

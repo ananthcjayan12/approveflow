@@ -1,11 +1,1 @@
-import { AlertTriangle, CheckCircle2, Clock3, RefreshCw } from 'lucide-react';
-import { Link } from 'react-router-dom';
-import { MetricCard } from '../components/MetricCard';
-import { PageHeader } from '../components/PageHeader';
-import { StatusPill } from '../components/StatusPill';
-import { Topbar } from '../components/Topbar';
-import { clients, projects } from '../lib/demo';
-
-export default function Dashboard() {
-  return <><Topbar/><div className="page-pad"><PageHeader title="Good afternoon, Pixel Agency." eyebrow="WHAT NEEDS CLIENT ACTION?"/><div className="metrics-grid"><MetricCard value={8} label="Waiting for approval" icon={<Clock3/>}/><MetricCard value={3} label="Changes requested" icon={<RefreshCw/>}/><MetricCard value={27} label="Approved this month" icon={<CheckCircle2/>}/><MetricCard value={4} label="Overdue reviews" icon={<AlertTriangle/>}/></div><div className="two-col"><section className="panel"><div className="panel-head"><div><h2>Recent projects</h2><p>Everything currently moving through review.</p></div><Link to="/app/projects">View all</Link></div><div className="list-table">{projects.map(project => { const client = clients.find(c => c.id === project.clientId)!; return <Link className="project-row" key={project.id} to={`/app/projects/${project.id}`}><div className="thumb-letter">{client.name[0]}</div><div className="grow"><b>{client.name} — {project.name}</b><span>{project.approved + project.changes + project.waiting} assets · due {project.due}</span></div><div className="mini-count approved">{project.approved} approved</div><div className="mini-count changes">{project.changes} changes</div><div className="mini-count waiting">{project.waiting} waiting</div></Link>})}</div></section><aside className="panel dark-panel"><div className="eyebrow warm">RECENT ACTIVITY</div><h2>Keep projects moving.</h2><div className="activity-list"><div><span className="dot green"/><p><b>Dr. Priya</b> approved Instagram Post 1</p><time>18 min ago</time></div><div><span className="dot orange"/><p><b>Dr. Priya</b> marked 2 changes on Carousel</p><time>24 min ago</time></div><div><span className="dot yellow"/><p>Reminder sent for Milano Trips</p><time>1 hour ago</time></div><div><span className="dot green"/><p>Version 2 uploaded to Summer Collection</p><time>3 hours ago</time></div></div></aside></div></div></>;
-}
+export { Dashboard as default } from './TrialPages';
