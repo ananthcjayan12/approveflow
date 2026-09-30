@@ -197,6 +197,27 @@
 .asset-workspace { height: clamp(560px, calc(100dvh - 230px), 940px); }
 .asset-workspace .workspace { height: 100%; }
 
+/* ---------- Asset page on phones: a full-screen viewer ---------- */
+.asset-immersive {
+  position: fixed; inset: 0; z-index: 30; isolation: isolate; display: flex; flex-direction: column;
+  height: calc(100dvh - var(--kb, 0px)); background: var(--bg);
+}
+.asset-bar {
+  flex: none; display: flex; align-items: center; gap: 2px; padding: env(safe-area-inset-top, 0px) 6px 0 6px; min-height: calc(52px + env(safe-area-inset-top, 0px));
+  background: var(--surface); border-bottom: 1px solid var(--border);
+}
+.asset-bar-title { flex: 1; min-width: 0; padding: 0 4px; }
+.asset-bar-title h1 { font-size: 15px; font-weight: 650; letter-spacing: -0.015em; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.asset-bar-title > span { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.asset-bar-title .badge { flex: none; padding: 1px 8px 1px 6px; font-size: 11.5px; }
+.asset-bar-title em { font-style: normal; font-size: 12.5px; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.asset-immersive-body { flex: 1; min-height: 0; }
+.asset-immersive-body .workspace { height: 100%; }
+.icon-button.has-dot { position: relative; }
+.icon-button.has-dot.is-hot::after { content: ""; position: absolute; top: 8px; right: 8px; width: 10px; height: 10px; border-radius: 50%; background: var(--red-dot); border: 2px solid var(--surface); }
+.asset-menu { width: min(300px, calc(100vw - 24px)); }
+.menu-note { margin: 4px 6px 8px; padding: 10px 12px; border-radius: var(--radius-sm); background: var(--red-soft); color: var(--red-text); font-size: 13px; font-weight: 500; }
+
 /* ---------- Upload ---------- */
 .dropzone {
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; text-align: center;

@@ -70,3 +70,20 @@ moment, and a `video_range` shows it for the whole portion. No duplicate video i
 
 Both reviewers (`POST /api/review/:token/comments`) and the designer (`POST /api/assets/:id/comments`) can send
 markup with a comment; replies from the designer are signed with the studio name.
+
+## Sessions
+
+Signing in sets an `approveflow_session` cookie (HttpOnly, Secure, SameSite=Lax, 30 days); only a SHA-256 hash of the
+token is stored. Sessions are independent, so signing in on a second device, or again later, never disturbs another
+session, and logging out ends only the current one.
+
+- **Sliding expiry.** While the app is in use the session is extended (and its cookie re-issued) at most about once a
+  day, on `GET /api/workspace`, which the app calls on every load and when the tab regains focus. An active person is
+  never signed out; an idle session still ends after 30 days. Expired sessions are removed at the next login.
+- **Session-aware public pages.** `/`, `/login` and `/signup` send an already-signed-in visitor to the dashboard (or to
+  the `next` page), so typing the address or letting the browser autocomplete to `/login` never asks for a second login.
+  Visit `/?site` to see the marketing page while signed in. A small `af-signed-in` hint in `localStorage` lets returning
+  visitors skip the flash of the marketing page; the server remains the authority and a 401 clears the hint.
+- **Deep links survive re-login.** A 401 inside the app redirects to `/login?next=<path>&reason=expired`; after signing in
+  the person lands back where they were. `next` is only followed for `/app…` and `/onboarding…` paths, never other sites.
+

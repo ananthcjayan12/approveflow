@@ -25,7 +25,13 @@ type Env = {
   RAZORPAY_PLAN_AGENCY?: string;
 };
 
-type SessionInfo = { userId: string; workspaceId: string };
+type SessionInfo = {
+  userId: string;
+  workspaceId: string;
+  sessionId: string;
+  expiresAt: string;
+  token: string;
+};
 type ReviewInfo = {
   link_id: string;
   approval_request_id: string;
@@ -91,17 +97,17 @@ async function getSession(c: any): Promise<SessionInfo | null> {
   const token = getCookie(c, "approveflow_session");
   if (!token) return null;
   const tokenHash = await sha256(token);
-  const row = await c.env.DB.prepare(
+  const row = (await c.env.DB.prepare(
     `
-    SELECT s.user_id AS userId, w.id AS workspaceId
+    SELECT s.id AS sessionId, s.user_id AS userId, s.expires_at AS expiresAt, w.id AS workspaceId
     FROM sessions s JOIN workspaces w ON w.owner_user_id = s.user_id
     WHERE s.token_hash = ? AND datetime(s.expires_at) > datetime('now')
     LIMIT 1
   `,
   )
     .bind(tokenHash)
-    .first();
-  return (row as SessionInfo | null) || null;
+    .first()) as Omit<SessionInfo, "token"> | null;
+  return row ? { ...row, token } : null;
 }
 
 async function requireSession(c: any): Promise<SessionInfo | Response> {
@@ -110,20 +116,44 @@ async function requireSession(c: any): Promise<SessionInfo | Response> {
   return session;
 }
 
-async function createSession(c: any, userId: string) {
-  const token = randomToken(32);
-  await c.env.DB.prepare(
-    "INSERT INTO sessions (id,user_id,token_hash,expires_at) VALUES (?,?,?,?)",
-  )
-    .bind(id("ses"), userId, await sha256(token), addHours(24 * 30))
-    .run();
+const SESSION_HOURS = 24 * 30;
+
+function setSessionCookie(c: any, token: string) {
   setCookie(c, "approveflow_session", token, {
     httpOnly: true,
     secure: !c.env.APP_ORIGIN.includes("localhost"),
     sameSite: "Lax",
     path: "/",
-    maxAge: 60 * 60 * 24 * 30,
+    maxAge: SESSION_HOURS * 3600,
   });
+}
+
+async function createSession(c: any, userId: string) {
+  const token = randomToken(32);
+  await c.env.DB.batch([
+    c.env.DB.prepare(
+      "INSERT INTO sessions (id,user_id,token_hash,expires_at) VALUES (?,?,?,?)",
+    ).bind(id("ses"), userId, await sha256(token), addHours(SESSION_HOURS)),
+    // Keep the table small: this person's expired sessions are of no use to anyone.
+    c.env.DB.prepare(
+      "DELETE FROM sessions WHERE user_id=? AND datetime(expires_at) <= datetime('now')",
+    ).bind(userId),
+  ]);
+  setSessionCookie(c, token);
+}
+
+/**
+ * Sliding expiry: while someone keeps using the app they stay signed in. The session
+ * is extended (and its cookie re-issued) at most about once a day.
+ */
+async function renewSession(c: any, session: SessionInfo) {
+  const remaining = Date.parse(session.expiresAt) - Date.now();
+  if (!Number.isFinite(remaining) || remaining > (SESSION_HOURS - 24) * 3600_000)
+    return;
+  await c.env.DB.prepare("UPDATE sessions SET expires_at=? WHERE id=?")
+    .bind(addHours(SESSION_HOURS), session.sessionId)
+    .run();
+  setSessionCookie(c, session.token);
 }
 
 async function audit(
@@ -409,6 +439,12 @@ app.post("/api/auth/logout", async (c) => {
       .run();
   deleteCookie(c, "approveflow_session", { path: "/" });
   return c.json({ ok: true });
+});
+
+// "Am I signed in?" is an ordinary question, so it gets an ordinary 200 either way
+// (unlike /api/auth/me, which is a 401 when there is nobody to describe).
+app.get("/api/auth/session", async (c) => {
+  return c.json({ signedIn: !!(await getSession(c)) });
 });
 
 app.get("/api/auth/me", async (c) => {
@@ -1162,6 +1198,7 @@ app.put("/api/uploads/local", async (c) => {
 app.get("/api/workspace", async (c) => {
   const session = await requireSession(c);
   if (session instanceof Response) return session;
+  await renewSession(c, session);
   const workspace = await c.env.DB.prepare(
     "SELECT * FROM workspaces WHERE id=?",
   )

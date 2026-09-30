@@ -316,8 +316,8 @@ export function Composer(p: ComposerProps) {
           <kbd>⌘</kbd>
           <kbd>↵</kbd> to send
         </span>
-        <button className="button button-primary small" disabled={busy || !text.trim()}>
-          {busy ? "Sending…" : "Comment"} <SendHorizontal size={15} />
+        <button className="button button-primary small send-btn" disabled={busy || !text.trim()} aria-label="Post comment">
+          <span className="send-label">{busy ? "Sending…" : "Comment"}</span> <SendHorizontal size={16} />
         </button>
       </div>
     </form>

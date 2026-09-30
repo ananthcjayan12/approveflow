@@ -28,7 +28,20 @@ Stylesheets are split by concern and imported from `styles/index.css`: `tokens`,
 | 761–1100 px | Icon-rail sidebar |
 | ≤ 760 px | Top bar + bottom tabs with a centred “Send” action; dialogs become bottom sheets |
 | ≥ 900 px (review) | Media stage beside a comments panel |
-| < 900 px (review) | Media stage with a bottom sheet for comments |
+| < 900 px, portrait or tall (review) | Media stage with a bottom sheet for comments |
+| Short landscape, ≤ 520 px tall (a phone held sideways) | Side by side again, with the markup tools moved into the panel and every row of chrome compacted |
+
+### Phones
+
+The media is the point, so on a phone every row of chrome has to earn its place:
+
+- The designer's asset page becomes a **full-screen viewer**: one slim top bar (back, title, status, ⋯ menu) replaces the
+  app header, page heading and tab bar.
+- The client page shows the current item in the header line ("3 of 6 · Reel — clinic story") instead of a separate title bar.
+- **Writing a comment tucks away the item strip and the Approve buttons**, so the picture keeps its size while you type.
+  A compose bar that opened by itself (after a mark or a selected portion) closes itself again once nothing is left to
+  comment on; one you opened on purpose (Add comment, a pin, clicking into the box) stays until you close it.
+- The comment box is chat-style, with a round send button beside it. Colour and undo appear only when a drawing tool is selected.
 
 ## Review workspace
 
@@ -51,6 +64,8 @@ The logic in `lib/` is pure and unit-tested; the components stay thin.
 
 - Drawing surfaces must set `touch-action: none`, otherwise browsers cancel the gesture the moment they decide a
   drag is a scroll.
+- When testing layouts, use a *portrait* reel and a phone-sized viewport that already accounts for the browser's own bars
+  (about 430×750 for a large iPhone): a landscape clip on a tall screen hides the problem.
 - Video seeks use `currentTime`, never `fastSeek()`: keyframe snapping would make comment timestamps inexact.
 - Shortcut handlers ignore Space/Enter only when a control was reached with the keyboard (`keyboardOwnsControl`),
   so clicking a thumbnail and then pressing Space still plays the video.

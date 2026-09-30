@@ -1,5 +1,6 @@
 import { ComponentType, Suspense, lazy } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
+import { SignedOutOnly, PageLoading } from "./components/SignedOutOnly";
 import { WorkspaceProvider } from "./lib/workspace";
 
 // Route-level code splitting: a client opening a review link downloads the review
@@ -34,23 +35,34 @@ const NotificationSettings = pick(agency, "NotificationSettings");
 const StoragePage = pick(agency, "StoragePage");
 const WorkspaceSettings = pick(agency, "WorkspaceSettings");
 
-function Loading() {
-  return (
-    <div className="center-page">
-      <div className="loading" role="status" aria-label="Loading">
-        <span className="spinner" />
-      </div>
-    </div>
-  );
-}
-
 export default function App() {
   return (
-    <Suspense fallback={<Loading />}>
+    <Suspense fallback={<PageLoading />}>
       <Routes>
-        <Route path="/" element={<Landing />} />
-        <Route path="/signup" element={<Signup />} />
-        <Route path="/login" element={<Login />} />
+        <Route
+          path="/"
+          element={
+            <SignedOutOnly allowSiteParam>
+              <Landing />
+            </SignedOutOnly>
+          }
+        />
+        <Route
+          path="/signup"
+          element={
+            <SignedOutOnly>
+              <Signup />
+            </SignedOutOnly>
+          }
+        />
+        <Route
+          path="/login"
+          element={
+            <SignedOutOnly>
+              <Login />
+            </SignedOutOnly>
+          }
+        />
         <Route path="/verify" element={<Verify />} />
         <Route
           path="/onboarding"

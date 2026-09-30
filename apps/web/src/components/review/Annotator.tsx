@@ -150,7 +150,7 @@ function Badge({
 export function Annotator(p: Props) {
   const [setBox, box, boxNode] = useElementSize<HTMLDivElement>();
   const frameRef = useRef<HTMLDivElement>(null);
-  const compact = useMediaQuery("(max-width: 640px)");
+  const compact = useMediaQuery("(max-width: 640px), (max-height: 520px)");
   const pad = compact ? 8 : 24;
   const fit = useMemo(
     () => containFit(box.w, box.h, p.media?.w ?? 16, p.media?.h ?? 9, pad),

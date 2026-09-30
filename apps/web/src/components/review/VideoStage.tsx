@@ -578,7 +578,7 @@ export function VideoStage(p: Props) {
           }}
         />
 
-        <div className="transport">
+        <div className={`transport${p.selection ? " has-portion" : ""}`}>
           <div className="transport-group">
             <button type="button" className="tbtn is-play" aria-label={clock.playing ? "Pause" : "Play"} onClick={toggle}>
               {clock.playing ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" />}

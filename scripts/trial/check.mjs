@@ -108,7 +108,7 @@ try {
     body: { name: "Other Designer", email: `other-${email}`, password },
     status: 201,
   });
-  const cookie = owner.cookie;
+  let cookie = owner.cookie;
   await request("/api/clients", { status: 401 });
   await request("/api/auth/login", {
     body: { email, password: "wrong-password" },
@@ -116,6 +116,48 @@ try {
   });
   const login = await request("/api/auth/login", { body: { email, password } });
   assert.ok(login.cookie);
+
+  // Signing in again (another device, or a second visit) must never disturb the first
+  // session, and signing out of one must leave the other signed in.
+  assert.notEqual(login.cookie, cookie, "each login gets its own session");
+  await request("/api/auth/me", { cookie });
+  await request("/api/auth/me", { cookie: login.cookie });
+  // The "am I signed in?" question answers 200 either way, so signed-out visitors see no errors.
+  assert.equal((await request("/api/auth/session", { cookie })).data.signedIn, true);
+  assert.equal((await request("/api/auth/session")).data.signedIn, false);
+  assert.equal((await request("/api/auth/session", { cookie: "approveflow_session=forged" })).data.signedIn, false);
+  await request("/api/auth/logout", { cookie: login.cookie, method: "POST" });
+  await request("/api/auth/me", { cookie: login.cookie, status: 401 });
+  await request("/api/auth/me", { cookie });
+
+  // Sessions slide: an active person stays signed in. Age one to two days from expiry,
+  // use the app, and it must be extended and its cookie re-issued.
+  const d1 = (query) =>
+    JSON.parse(
+      execFileSync(
+        process.execPath,
+        [cli, "d1", "execute", "DB", "--local", "--persist-to", state, "--config", configPath, "--command", query, "--json"],
+        { stdio: "pipe" },
+      ).toString(),
+    )[0].results;
+  const soon = new Date(Date.now() + 2 * 86400_000).toISOString();
+  d1(`UPDATE sessions SET expires_at='${soon}' WHERE user_id=(SELECT id FROM users WHERE email='${email}')`);
+  const renewed = await fetch(`${base}/api/workspace`, { headers: { cookie } });
+  assert.equal(renewed.status, 200);
+  assert.match(renewed.headers.get("set-cookie") ?? "", /approveflow_session=.*Max-Age=2592000/i, "cookie is re-issued");
+  const [row] = d1(`SELECT MAX(expires_at) AS e FROM sessions WHERE user_id=(SELECT id FROM users WHERE email='${email}')`);
+  const days = (Date.parse(row.e) - Date.now()) / 86400_000;
+  assert.ok(days > 29 && days <= 30.01, `session extended to ~30 days (got ${days.toFixed(2)})`);
+  // …but not on every request: a fresh session is left alone.
+  const again = await fetch(`${base}/api/workspace`, { headers: { cookie } });
+  assert.equal(again.headers.get("set-cookie"), null, "no needless re-issue");
+  // An expired session is refused.
+  d1(`UPDATE sessions SET expires_at='2020-01-01T00:00:00.000Z' WHERE user_id=(SELECT id FROM users WHERE email='${email}')`);
+  await request("/api/auth/me", { cookie, status: 401 });
+  const relogin = await request("/api/auth/login", { body: { email, password } });
+  await request("/api/auth/me", { cookie: relogin.cookie });
+  assert.equal(d1(`SELECT COUNT(*) AS n FROM sessions WHERE user_id=(SELECT id FROM users WHERE email='${email}')`)[0].n, 1, "expired sessions are cleaned up on login");
+  cookie = relogin.cookie;
   await request("/api/clients", {
     cookie,
     body: { companyName: "Blocked" },

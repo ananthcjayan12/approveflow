@@ -23,6 +23,7 @@ import { isTyping, useMediaQuery, useWindowKey } from "../lib/hooks";
 import { formatBytes } from "../lib/format";
 import { useWorkspace } from "../lib/workspace";
 import { api } from "../lib/api";
+import { setSignedInHint } from "../lib/auth";
 
 const items = [
   { to: "/app/dashboard", Icon: Home, label: "Home" },
@@ -38,7 +39,10 @@ function AccountMenu({ anchor, open, onClose }: { anchor: HTMLElement | null; op
   const [error, setError] = useState("");
   const logout = () =>
     void api("/api/auth/logout", { method: "POST" })
-      .then(() => window.location.assign("/login"))
+      .then(() => {
+        setSignedInHint(false);
+        window.location.assign("/login");
+      })
       .catch((e) => setError(e.message));
   return (
     <Popover anchor={anchor} open={open} onClose={onClose} side="top" align="start" className="account-menu" label="Account">

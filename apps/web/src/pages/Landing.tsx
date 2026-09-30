@@ -21,6 +21,7 @@ import { Brand } from "../components/Brand";
 import { PlanCards } from "../components/PlanCards";
 import { ThemeToggle } from "../components/ThemeToggle";
 import { MOCK_TOOLS, MarkupArt, ReviewMock, TimelineArt } from "../components/marketing/Mock";
+import { SiteAuthLinks, useSignedInUi } from "../components/marketing/SiteAuthLinks";
 
 const steps = [
   { Icon: UploadCloud, title: "Upload your content", body: "Drag in images, carousels, videos or PDFs. Everything stays private." },
@@ -65,6 +66,7 @@ const nav = [
 export default function Landing() {
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const signedIn = useSignedInUi();
   useEffect(() => {
     const on = () => setScrolled(window.scrollY > 8);
     on();
@@ -86,8 +88,7 @@ export default function Landing() {
           </nav>
           <div className="site-nav-cta">
             <ThemeToggle />
-            <Link className="link-quiet hide-mobile" to="/login">Log in</Link>
-            <Link className="button button-primary" to="/signup">Start free</Link>
+            <SiteAuthLinks signedIn={signedIn} />
             <button className="icon-button ghost menu-toggle" aria-label={open ? "Close menu" : "Open menu"} aria-expanded={open} onClick={() => setOpen((v) => !v)}>
               {open ? <X size={20} /> : <Menu size={20} />}
             </button>
@@ -98,7 +99,7 @@ export default function Landing() {
             {nav.map(([label, href]) => (
               <a key={href} href={href} onClick={() => setOpen(false)}>{label}</a>
             ))}
-            <Link to="/login">Log in</Link>
+            {!signedIn && <Link to="/login">Log in</Link>}
           </nav>
         )}
       </header>
@@ -117,8 +118,8 @@ export default function Landing() {
             work — and you see exactly what to change. No more chasing feedback across WhatsApp and email.
           </p>
           <div className="hero-actions">
-            <Link className="button button-primary large" to="/signup">
-              Start free <ArrowRight size={18} />
+            <Link className="button button-primary large" to={signedIn ? "/app/dashboard" : "/signup"}>
+              {signedIn ? "Open dashboard" : "Start free"} <ArrowRight size={18} />
             </Link>
             <a className="button button-secondary large" href="#how">See how it works</a>
           </div>
@@ -257,8 +258,14 @@ export default function Landing() {
         <nav aria-label="Footer">
           <a href="#features">Features</a>
           <Link to="/pricing">Pricing</Link>
-          <Link to="/login">Log in</Link>
-          <Link to="/signup">Sign up</Link>
+          {signedIn ? (
+            <Link to="/app/dashboard">Dashboard</Link>
+          ) : (
+            <>
+              <Link to="/login">Log in</Link>
+              <Link to="/signup">Sign up</Link>
+            </>
+          )}
         </nav>
         <span>© {new Date().getFullYear()} ApproveFlow</span>
       </footer>

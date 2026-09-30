@@ -119,6 +119,14 @@
 .shape-opt { display: grid; justify-items: center; gap: 4px; width: 72px; padding: 10px 6px 8px; border: 0; border-radius: var(--radius); background: transparent; color: var(--text-2); font-size: 12px; font-weight: 600; }
 .shape-opt:hover { background: var(--surface-3); color: var(--text); }
 .shape-opt[aria-pressed="true"] { background: var(--brand-soft); color: var(--brand-text); }
+/* The toolbar on a light surface (the side panel on a sideways phone). */
+.toolbar.is-light { background: var(--surface); border-bottom: 1px solid var(--border); }
+.toolbar.is-light .tool-group { background: var(--surface-3); }
+.toolbar.is-light .tool { color: var(--text-2); }
+.toolbar.is-light .tool:hover:not(:disabled) { background: var(--surface); color: var(--text); }
+.toolbar.is-light .tool[aria-pressed="true"] { background: var(--brand); color: #fff; }
+.toolbar.is-light .tool-sep { background: var(--border); }
+.toolbar.is-light .ink-dot { box-shadow: 0 0 0 1px var(--border-strong); }
 .tool-sep { width: 1px; height: 22px; background: var(--stage-line); }
 .ink-dot { width: 20px; height: 20px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5); }
 .tool-ink:disabled .ink-dot { border-style: dashed; box-shadow: none; }
@@ -216,6 +224,7 @@
   background: rgba(154, 154, 248, 0.2); border: 1px solid rgba(154, 154, 248, 0.7); border-radius: 10px;
   color: #e6e7ff; font-size: 12.5px; font-weight: 650;
 }
+.portion-chip span { white-space: nowrap; }
 .portion-chip button { display: grid; place-items: center; width: 26px; height: 26px; padding: 0; border: 0; border-radius: 7px; background: transparent; color: inherit; }
 .portion-chip button:hover { background: rgba(255, 255, 255, 0.16); }
 .shortcuts { width: 280px; padding: 12px 14px; }
@@ -309,7 +318,7 @@ button.cbadge { cursor: pointer; }
    Peek and compose sit in normal flow, so the media re-fits above them and a
    pin you just dropped never ends up hidden behind the comment box.
    ========================================================================== */
-@media (max-width: 899px) {
+@media (max-width: 899px) and (orientation: portrait), (max-width: 899px) and (min-height: 521px) {
   .workspace { display: flex; flex-direction: column; gap: 0; overflow: hidden; }
   .stage { flex: 1; border-radius: 0; border-width: 0; box-shadow: none; }
   .panel { flex: none; border-radius: 0; border-width: 1px 0 0; box-shadow: none; }
@@ -341,7 +350,7 @@ button.cbadge { cursor: pointer; }
   .composer-input { min-height: 76px; }
   .zoom-controls { right: 8px; bottom: 8px; }
 }
-@media (max-width: 899px) and (pointer: coarse) {
+@media (max-width: 899px) and (orientation: portrait) and (pointer: coarse), (max-width: 899px) and (min-height: 521px) and (pointer: coarse) {
   .tool { width: 40px; height: 40px; }
   .tbtn { min-width: 40px; height: 40px; }
   .tl-handle { width: 34px; }
@@ -386,6 +395,8 @@ button.cbadge { cursor: pointer; }
 .rv-id { display: flex; align-items: center; gap: 12px; min-width: 0; flex: 1; }
 .rv-title { min-width: 0; padding-left: 12px; border-left: 1px solid var(--border); }
 .rv-title b, .rv-title h1, .rv-title span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rv-title .rv-sub-item { display: none; }
+.panel-original { align-self: flex-start; }
 .rv-title b, .rv-title h1 { font-size: 14.5px; font-weight: 650; letter-spacing: -0.012em; line-height: 1.35; }
 .rv-title span { font-size: 12.5px; color: var(--text-3); }
 .rv-progress { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--text-2); white-space: nowrap; }
@@ -430,7 +441,7 @@ button.cbadge { cursor: pointer; }
 .success-icon { display: grid; place-items: center; width: 68px; height: 68px; border-radius: 50%; background: var(--green-soft); color: var(--green-dot); box-shadow: 0 0 0 8px color-mix(in srgb, var(--green-dot) 12%, transparent); }
 .success-icon.big { width: 88px; height: 88px; }
 
-@media (max-width: 899px) {
+@media (max-width: 899px) and (orientation: portrait), (max-width: 899px) and (min-height: 521px) {
   .rv-header { height: 54px; padding: 0 12px; gap: 10px; }
   .rv-title { padding-left: 10px; }
   .rv-progress .progress, .rv-header .decision-buttons { display: none; }
@@ -446,4 +457,81 @@ button.cbadge { cursor: pointer; }
   .rv-decision .button { flex: 1; min-width: 0; }
   html[data-kb="open"] .rv-decision { display: none; }
   .rv { height: calc(100dvh - var(--kb, 0px)); }
+}
+
+/* ==========================================================================
+   Phones: the media is the point, so every row of chrome has to earn its place.
+   ========================================================================== */
+@media (max-width: 640px) {
+  .rv-title .rv-sub-full { display: none; }
+  .rv-title .rv-sub-item { display: block; }
+  .rv-header { height: 48px; }
+  .rv-rail { padding: 6px 12px; }
+  .film { width: 44px; height: 44px; border-radius: 10px; }
+  .film-num { left: 2px; top: 2px; min-width: 16px; height: 16px; font-size: 10px; line-height: 16px; }
+  .rv .stage-top { display: none; }
+  .toolbar { padding: 4px 8px; }
+  .tl { padding-top: 6px; }
+  .tl-selection-label { display: none; }
+  .tl-lane { min-height: 22px; }
+  .tl-hint { padding-left: 12px; }
+  .transport { margin-top: 0; }
+  .video-bar { padding-bottom: 4px; }
+  .sheet-handle { min-height: 48px; }
+  .sheet-title, .sheet-action { min-height: 40px; }
+  .rv-decision { padding: 8px 12px calc(8px + var(--safe-bottom)); }
+  .rv-decision .button { height: 44px; }
+  /* Writing a comment: nothing else on screen matters, so the picture gets the space. */
+  .rv.is-composing .rv-decision, .rv.is-composing .rv-rail { display: none; }
+}
+
+@media (max-width: 640px) {
+  /* Chat-style composer: text box with a round send button beside it. */
+  .composer { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 8px; row-gap: 0; align-items: end; padding: 8px 12px 10px; }
+  .composer > .ctx-chips { grid-column: 1 / -1; grid-row: 1; margin-bottom: 8px; }
+  .composer > .composer-input { grid-column: 1; grid-row: 2; min-height: 48px; max-height: 120px; padding: 10px 12px; }
+  .composer > .composer-foot { grid-column: 2; grid-row: 2; }
+  .composer > .notice { grid-column: 1 / -1; grid-row: 3; margin-top: 8px; }
+  .send-btn { width: 46px; height: 46px; padding: 0; border-radius: 50%; }
+  .send-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .panel.sheet-compose .composer { padding-top: 2px; }
+}
+@media (max-width: 420px) {
+  /* On the narrowest screens a selected portion needs the room the speed button would take. */
+  .transport.has-portion .tbtn.rate { display: none; }
+}
+
+/* ==========================================================================
+   A phone held sideways (~340 px tall): side-by-side, chrome squeezed to the bone.
+   ========================================================================== */
+@media (orientation: landscape) and (max-height: 520px) {
+  .rv-title .rv-sub-full { display: none; }
+  .rv-title .rv-sub-item { display: block; }
+  .rv-header { height: 44px; padding: 0 12px; gap: 10px; }
+  .rv-progress .progress { display: none; }
+  .rv-body { grid-template-columns: 56px minmax(0, 1fr); gap: 10px; padding: 8px 12px; }
+  .rv-body.single { grid-template-columns: minmax(0, 1fr); }
+  .film { width: 48px; height: 48px; border-radius: 10px; }
+  .film-mark { width: 18px; height: 18px; }
+  .workspace { grid-template-columns: minmax(0, 1fr) 300px; gap: 10px; }
+  .rv .stage-top { display: none; }
+  .stage, .panel { border-radius: var(--radius-lg); }
+  .toolbar { padding: 4px 8px; }
+  .tool { width: 36px; height: 36px; }
+  .tl { padding-top: 4px; }
+  .tl-selection-label { display: none; }
+  .tl-lane { min-height: 20px; }
+  .video-bar { padding: 2px 10px 4px; }
+  .tbtn { min-width: 34px; height: 34px; }
+  .transport { margin-top: 0; }
+  .panel-body { padding: 8px 8px 4px; gap: 10px; }
+  .caption-box { padding: 8px 10px; }
+  .composer { padding: 8px 10px; }
+  .composer-input { min-height: 52px; }
+  .asset-bar { min-height: 44px; }
+  .panel > .toolbar { flex: none; padding: 4px 6px; }
+  .panel > .toolbar .tool { width: 34px; height: 34px; }
+  .tl-track { margin: 2px 0 4px; }
+  .rv-header { height: 40px; }
+  .rv-body { padding: 6px 10px; }
 }

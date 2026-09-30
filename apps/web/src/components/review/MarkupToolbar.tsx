@@ -37,6 +37,8 @@ type Props = {
   onClear: () => void;
   /** What the hand tool is called for this media ("Move" for images, "Play" for video). */
   handLabel?: string;
+  /** Sits on a light surface (the side panel) instead of the dark stage. */
+  light?: boolean;
 };
 
 /** Ink options only make sense for the drawing tools. */
@@ -45,13 +47,13 @@ const hasSize = (tool: ToolId) => tool !== "hand" && tool !== "pin";
 
 const SHAPE_IDS: ToolId[] = ["rect", "ellipse", "arrow"];
 
-export function MarkupToolbar({ tool, onTool, color, onColor, size, onSize, canUndo, onUndo, onClear, handLabel = "Move" }: Props) {
+export function MarkupToolbar({ tool, onTool, color, onColor, size, onSize, canUndo, onUndo, onClear, handLabel = "Move", light: onLight = false }: Props) {
   const [anchor, setAnchor] = useState<HTMLButtonElement | null>(null);
   const [open, setOpen] = useState(false);
   const light = color.toLowerCase() === "#ffffff";
 
   // On phones the three shape tools share one button so every target stays >= 40px.
-  const compact = useMediaQuery("(max-width: 520px)");
+  const compact = useMediaQuery("(max-width: 520px), (orientation: landscape) and (max-height: 520px)");
   const [shapeAnchor, setShapeAnchor] = useState<HTMLButtonElement | null>(null);
   const [shapesOpen, setShapesOpen] = useState(false);
   const [lastShape, setLastShape] = useState<ToolId>("rect");
@@ -62,7 +64,7 @@ export function MarkupToolbar({ tool, onTool, color, onColor, size, onSize, canU
   const ShapeIcon = TOOLS.find((t) => t.id === lastShape)!.Icon;
 
   return (
-    <div className="toolbar" role="toolbar" aria-label="Markup tools">
+    <div className={`toolbar${onLight ? " is-light" : ""}`} role="toolbar" aria-label="Markup tools">
       <div className="tool-group">
         {shown.map(({ id, label, key, Icon }) => {
           const name = id === "hand" ? handLabel : label;
@@ -99,25 +101,30 @@ export function MarkupToolbar({ tool, onTool, color, onColor, size, onSize, canU
         )}
       </div>
 
-      <span className="tool-sep" aria-hidden />
-
-      <div className="tool-group">
-        <button
-          ref={setAnchor}
-          type="button"
-          className="tool tool-ink"
-          aria-label="Colour and thickness"
-          aria-expanded={open}
-          data-tip="Colour & thickness"
-          disabled={!hasInk(tool)}
-          onClick={() => setOpen((v) => !v)}
-        >
-          <span className={`ink-dot${light ? " is-light" : ""}`} style={{ background: hasInk(tool) ? color : "transparent" }} />
-        </button>
-        <button type="button" className="tool" aria-label="Undo last mark (⌘Z)" data-tip="Undo · ⌘Z" disabled={!canUndo} onClick={onUndo}>
-          <Undo2 size={18} />
-        </button>
-      </div>
+      {/* Colour and undo only appear once they can do something, so a plain "play" state stays uncluttered. */}
+      {(hasInk(tool) || canUndo) && (
+        <>
+          <span className="tool-sep" aria-hidden />
+          <div className="tool-group">
+            {hasInk(tool) && (
+              <button
+                ref={setAnchor}
+                type="button"
+                className="tool tool-ink"
+                aria-label="Colour and thickness"
+                aria-expanded={open}
+                data-tip="Colour & thickness"
+                onClick={() => setOpen((v) => !v)}
+              >
+                <span className={`ink-dot${light ? " is-light" : ""}`} style={{ background: color }} />
+              </button>
+            )}
+            <button type="button" className="tool" aria-label="Undo last mark (⌘Z)" data-tip="Undo · ⌘Z" disabled={!canUndo} onClick={onUndo}>
+              <Undo2 size={18} />
+            </button>
+          </div>
+        </>
+      )}
 
       <Popover anchor={shapeAnchor} open={shapesOpen} onClose={() => setShapesOpen(false)} align="start" className="shape-pop" label="Shapes">
         {TOOLS.filter((t) => SHAPE_IDS.includes(t.id)).map(({ id, label, Icon }) => (

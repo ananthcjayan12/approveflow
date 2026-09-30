@@ -2,8 +2,10 @@ import { Link } from "react-router-dom";
 import { Brand } from "../components/Brand";
 import { PlanCards } from "../components/PlanCards";
 import { ThemeToggle } from "../components/ThemeToggle";
+import { SiteAuthLinks, useSignedInUi } from "../components/marketing/SiteAuthLinks";
 
 export default function Pricing() {
+  const signedIn = useSignedInUi();
   return (
     <div className="site">
       <header className="site-nav-wrap">
@@ -14,8 +16,7 @@ export default function Pricing() {
           <span className="site-links" />
           <div className="site-nav-cta">
             <ThemeToggle />
-            <Link className="link-quiet hide-mobile" to="/login">Log in</Link>
-            <Link className="button button-primary" to="/signup">Start free</Link>
+            <SiteAuthLinks signedIn={signedIn} />
           </div>
         </div>
       </header>

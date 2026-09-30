@@ -175,6 +175,7 @@ export default function ClientReview() {
   const [changeText, setChangeText] = useState("");
   const [welcome, setWelcome] = useState(() => !storage.get(`af-welcomed-${token}`));
   const [showDone, setShowDone] = useState(true);
+  const [composing, setComposing] = useState(false);
 
   const load = useCallback(async () => {
     setData(await api<ReviewData>(`/api/review/${token}`));
@@ -275,18 +276,21 @@ export default function ClientReview() {
   );
 
   return (
-    <div className="rv">
+    <div className={`rv${composing ? " is-composing" : ""}`}>
       <header className="rv-header">
         <div className="rv-id">
           <Brand compact />
           <div className="rv-title">
             <h1>{data.project_name}</h1>
-            <span>
+            <span className="rv-sub-full">
               {data.workspace_name ? `${data.workspace_name} · ` : ""}for {data.company_name}
+            </span>
+            <span className="rv-sub-item">
+              {index + 1} of {assets.length} · {asset.name}
             </span>
           </div>
         </div>
-        <div className="rv-progress" aria-label="Review progress">
+        <div className="rv-progress" role="group" aria-label="Review progress">
           <span className="rv-progress-full">
             <b>{doneCount}</b> of {assets.length} reviewed
           </span>
@@ -339,6 +343,7 @@ export default function ClientReview() {
                 token={token}
                 comments={comments}
                 onSave={load}
+                onComposingChange={setComposing}
                 stageHeader={
                   <div className="stage-top">
                     {assets.length > 1 && (

@@ -130,6 +130,7 @@ wrangler.generated.json
 ## Important production notes
 
 - Review links are generated as random tokens; only a SHA-256 hash is persisted.
+- Sessions last 30 days and renew while the app is in use; a signed-in visitor is sent straight to the dashboard (see [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md#sessions)).
 - Billing state is driven by verified Razorpay webhooks, not the browser callback.
 - Direct-upload APIs support a single PUT for smaller media and multipart upload for large files. GB-sized video bodies do not pass through the Worker.
 - Storage quotas are enforced before upload initiation.

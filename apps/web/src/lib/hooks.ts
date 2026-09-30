@@ -15,6 +15,15 @@ export function useElementSize<T extends HTMLElement = HTMLDivElement>() {
   return [setNode, size, node] as const;
 }
 
+/**
+ * Stacked review layout (media above a bottom sheet): narrow screens, except a phone held
+ * sideways — that is too short to stack anything, so it keeps the side-by-side layout.
+ * The CSS uses the same two conditions.
+ */
+export const STACKED_QUERY = "(max-width: 899px) and (orientation: portrait), (max-width: 899px) and (min-height: 521px)";
+/** A phone held sideways: very little height, so every row of chrome has to go. */
+export const SHORT_LANDSCAPE_QUERY = "(orientation: landscape) and (max-height: 520px)";
+
 export function useMediaQuery(query: string) {
   const get = () => (typeof window !== "undefined" && window.matchMedia ? window.matchMedia(query).matches : false);
   const [matches, setMatches] = useState(get);

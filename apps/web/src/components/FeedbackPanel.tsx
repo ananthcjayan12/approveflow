@@ -8,7 +8,7 @@ import { MarkupToolbar, TOOLS } from "./review/MarkupToolbar";
 import { VideoStage } from "./review/VideoStage";
 import { DEFAULT_COLORS, Shape, SizeKey, Span, ToolId, placeComments } from "../lib/annotations";
 import { formatSpan } from "../lib/timeline";
-import { isTyping, keyboardOwnsControl, useKeyboardInset, useMediaQuery, useWindowKey } from "../lib/hooks";
+import { SHORT_LANDSCAPE_QUERY, STACKED_QUERY, isTyping, keyboardOwnsControl, useKeyboardInset, useMediaQuery, useWindowKey } from "../lib/hooks";
 import { timeAgo } from "../lib/format";
 import { AssetRow, CommentRow, mediaUrl } from "../lib/workspace";
 
@@ -31,6 +31,7 @@ export function FeedbackPanel({
   onSave,
   stageHeader,
   className,
+  onComposingChange,
 }: {
   asset: AssetRow;
   comments: CommentRow[];
@@ -41,13 +42,16 @@ export function FeedbackPanel({
   /** Rendered at the top of the stage (title, pager, status). */
   stageHeader?: ReactNode;
   className?: string;
+  /** True while the phone's compose bar is open, so the page can give the media more room. */
+  onComposingChange?: (composing: boolean) => void;
 }) {
   const isVideo = asset.kind === "video";
   const isPdf = asset.kind === "pdf";
   const reviewer = !!token;
   const canMark = canComment && !isPdf;
   const src = mediaUrl(asset, token);
-  const narrow = useMediaQuery("(max-width: 899px)");
+  const narrow = useMediaQuery(STACKED_QUERY);
+  const sideways = useMediaQuery(SHORT_LANDSCAPE_QUERY);
   useKeyboardInset();
 
   const current = useMemo(() => comments.filter((c) => c.asset_version_id === asset.version_id), [comments, asset.version_id]);
@@ -72,6 +76,15 @@ export function FeedbackPanel({
   const activeId = hover ?? picked ?? fresh;
 
   const [sheet, setSheet] = useState<Sheet>("peek");
+  // Did the compose bar open by itself (a mark or a selected portion) rather than because the
+  // person asked to write? Only an automatic one closes itself when there's nothing left to say.
+  const autoCompose = useRef(false);
+  const composing = narrow && sheet === "compose";
+  useEffect(() => {
+    onComposingChange?.(composing);
+    return () => onComposingChange?.(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [composing]);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const stageRef = useRef<HTMLElement | null>(null);
   const textRef = useRef<HTMLTextAreaElement | null>(null);
@@ -80,6 +93,7 @@ export function FeedbackPanel({
   const setInk = (color: string) => tool !== "hand" && setInks((prev) => ({ ...prev, [tool]: color }));
 
   const focusComposer = useCallback(() => {
+    autoCompose.current = false;
     if (narrow) flushSync(() => setSheet((s) => (s === "full" ? s : "compose")));
     textRef.current?.focus({ preventScroll: true });
   }, [narrow]);
@@ -88,11 +102,20 @@ export function FeedbackPanel({
     setDraft((d) => (shape.t === "pin" ? [...d.filter((s) => s.t !== "pin"), shape] : [...d, shape]));
     if (isVideo && time !== undefined) setMarkedAt((m) => m ?? time);
     setPicked(null);
-    if (narrow) setSheet((s) => (s === "peek" ? "compose" : s));
+    if (narrow)
+      setSheet((s) => {
+        if (s === "peek") autoCompose.current = true;
+        return s === "peek" ? "compose" : s;
+      });
     // A pin is a complete gesture, so go straight to writing. Strokes are not:
     // people usually draw several before typing.
     if (shape.t === "pin") focusComposer();
   };
+
+  // Everything that opened the bar was taken away again: close it.
+  useEffect(() => {
+    if (sheet === "compose" && autoCompose.current && draft.length === 0 && !portion) setSheet("peek");
+  }, [sheet, draft.length, portion]);
 
   const undo = () =>
     setDraft((d) => {
@@ -107,7 +130,11 @@ export function FeedbackPanel({
   const setPortionAndSheet = useCallback(
     (span: Span | null) => {
       setPortion(span);
-      if (span && narrow) setSheet((s) => (s === "peek" ? "compose" : s));
+      if (span && narrow)
+        setSheet((s) => {
+          if (s === "peek") autoCompose.current = true;
+          return s === "peek" ? "compose" : s;
+        });
     },
     [narrow],
   );
@@ -189,26 +216,28 @@ export function FeedbackPanel({
       : "No comments on this version yet.";
 
   const total = current.length;
+  const toolbar = (
+    <MarkupToolbar
+      tool={tool}
+      onTool={setTool}
+      color={ink}
+      onColor={setInk}
+      size={size}
+      onSize={setSize}
+      canUndo={draft.length > 0}
+      onUndo={undo}
+      onClear={clearDraft}
+      handLabel={isVideo ? "Play" : "Move"}
+      light={sideways}
+    />
+  );
 
   return (
     <div className={cx("workspace", className)} data-kind={asset.kind}>
       <section className="stage" ref={stageRef}>
         {stageHeader}
 
-        {canMark && (
-          <MarkupToolbar
-            tool={tool}
-            onTool={setTool}
-            color={ink}
-            onColor={setInk}
-            size={size}
-            onSize={setSize}
-            canUndo={draft.length > 0}
-            onUndo={undo}
-            onClear={clearDraft}
-            handLabel={isVideo ? "Play" : "Move"}
-          />
-        )}
+        {canMark && !sideways && toolbar}
 
         <div className="stage-body">
           {isPdf ? (
@@ -310,6 +339,7 @@ export function FeedbackPanel({
       {narrow && sheet === "full" && <div className="sheet-backdrop" onClick={() => setSheet("peek")} />}
 
       <aside className={cx("panel", narrow && `sheet-${sheet}`)} aria-label="Comments">
+        {canMark && sideways && toolbar}
         {narrow && (
           <div className="sheet-handle">
             <button
@@ -347,6 +377,11 @@ export function FeedbackPanel({
               <p>{asset.caption}</p>
             </div>
           )}
+          {narrow && (
+            <a className="link small panel-original" href={src} target="_blank" rel="noreferrer">
+              <ExternalLink size={13} /> Open original file
+            </a>
+          )}
           {!narrow && (
             <div className="panel-head">
               <h2 className="panel-title">Comments</h2>
@@ -383,7 +418,10 @@ export function FeedbackPanel({
             onClearDraft={clearDraft}
             onClearPortion={() => setPortion(null)}
             textareaRef={textRef}
-            onFocusText={() => isVideo && videoRef.current?.pause()}
+            onFocusText={() => {
+              autoCompose.current = false;
+              if (isVideo) videoRef.current?.pause();
+            }}
             onPosted={onPosted}
           />
         ) : (

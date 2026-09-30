@@ -5,8 +5,9 @@ import {
   useState,
   ReactNode,
 } from "react";
-import { Navigate } from "react-router-dom";
-import { api } from "./api";
+import { Navigate, useLocation } from "react-router-dom";
+import { ApiError, api } from "./api";
+import { setSignedInHint } from "./auth";
 export type ClientRow = {
   id: string;
   company_name: string;
@@ -83,6 +84,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [data, setData] = useState<Omit<Data, "reload"> | null>(null);
   const [error, setError] = useState("");
   const [unauthorized, setUnauthorized] = useState(false);
+  const location = useLocation();
   const reload = async () => {
     try {
       const [workspace, clients, projects, assets, events] = await Promise.all([
@@ -95,9 +97,10 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       setData({ workspace, clients, projects, assets, events });
       setError("");
     } catch (e) {
-      if (e instanceof Error && e.message === "Authentication required")
+      if (e instanceof ApiError && e.status === 401) {
+        setSignedInHint(false);
         setUnauthorized(true);
-      else setError(String(e));
+      } else setError(String(e));
     }
   };
   useEffect(() => {
@@ -106,7 +109,11 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     window.addEventListener("focus", refresh);
     return () => window.removeEventListener("focus", refresh);
   }, []);
-  if (unauthorized) return <Navigate to="/login" replace />;
+  if (unauthorized) {
+    // Remember where they were, so signing in again lands them back there.
+    const here = encodeURIComponent(location.pathname + location.search);
+    return <Navigate to={`/login?next=${here}&reason=expired`} replace />;
+  }
   if (!data)
     return (
       <div className="center-page">
